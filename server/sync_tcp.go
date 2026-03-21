@@ -19,6 +19,8 @@ func readCommand(c net.Conn)(string,error){
 	return string(buf[:n]),nil
 }
 
+
+
 func RunSyncTCPServer(){
 
 
@@ -61,7 +63,27 @@ func RunSyncTCPServer(){
 		for{
 			//over the docket, continuously read the command and print it out 
 			cmd,err:=readCommand(c)
+			/*
+			as the read command is done, this connect the connection else if the error is propogated back (like client is dissconneted), then err!=null
+			then at time i will close my socket connection, like i want to reduce the number of concurrent client whihc i am handling
+			and print krenge like earlier i have this much now i have these much
 
+			and if it is graceful termination, like where the client is sending th termination, i am simply breaking out of loop
+
+			and if my error is not nil then i wills imply tekk ok ye hai 
+			*/
+			if err!=nil{
+				c.Close()
+				con_client-=1
+				log.Println("client disconnected", c.RemoteAddr(), "concurrent clients", con_client);
+				if err==io.EOF{
+					break
+				}
+				log.Println("command",cmd)
+				if err=responsd(cmd,c); err!=nil{
+					log.Println("err write: ",err)
+				}
+			}
 		}
 	}
 }
