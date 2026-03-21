@@ -1,7 +1,11 @@
 
+func readCommand(c net.Conn)(string,erro){
+	
+}
+
 func RunSyncTCPServer(){
 
-	
+
 	log.Println("startign a synchronous TCP Server on", config.Host,config.Port)
 
 	var con_client int=0;
