@@ -1,6 +1,22 @@
 
-func readCommand(c net.Conn)(string,erro){
-	
+func readCommand(c net.Conn)(string,error){
+	/*
+	Take the socket connection and basically fire the system call Read
+
+	TODO: Max read in one shot is 512 bytes
+	To allow input>512 bytes , then repreated read until
+	we get EOF or designated delimeter
+
+	It is listening over the socket and it is trying to read messag eover the socket 
+	if there is nothing taht is coming from my lcient then it is a blocking call, until i get somehting from client 
+	when we read it we put it into buffer and then, we get the number of bytes , if there is error we throw errer else we send it back 
+	*/
+	var buf []byte=make([]byte,512)
+	n,err:=c.Read(buf[:])
+	if err!=nul{
+		return "",err
+	}
+	return string(buf[:n]),nil
 }
 
 func RunSyncTCPServer(){
