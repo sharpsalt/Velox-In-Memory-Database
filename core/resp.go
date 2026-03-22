@@ -3,6 +3,17 @@ Basically encoding and decoding of values will go here
 
 */
 
+//read a RESP encoded simple string from the data and returns 
+//the string, the data, and the error 
+func readSimpleString(data []byte)(string,int,error){
+	//first character +b 
+	pos:=1
+	for ; data[pos]!='\r';pos++{
+	}
+
+	return string(data[1:pos]),pos+2,nil
+}
+
 func DecodeOne(data []byte)(interface{},int,error){
 	if len(data)==0{
 		return nil,0,error.New("no data");
