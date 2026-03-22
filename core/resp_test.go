@@ -16,3 +16,16 @@ func TestSimpleStringDecode(t *testing.T){
 		}
 	}
 }
+
+
+func TestError(t *testing.T){
+	cases:=map[string]string{
+		"-Error Message\r\n":"Error message"
+	}
+	for k,v := range cases{
+		value,_:=core.Decode([]byte(k))
+		if v!=value{
+			t.Fail()
+		}
+	}
+}
