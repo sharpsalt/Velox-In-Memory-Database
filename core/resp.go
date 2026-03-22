@@ -14,6 +14,13 @@ func readSimpleString(data []byte)(string,int,error){
 	return string(data[1:pos]),pos+2,nil
 }
 
+//read a RESP encoded error from data and returns 
+//the error string, the delta, and the error
+//It is almsot same as ReadSimpleString, only the difference is it starts with - instead of +
+func readError(data []byte)(string,int,error){
+	return readSimpleString(data)
+}
+
 func DecodeOne(data []byte)(interface{},int,error){
 	if len(data)==0{
 		return nil,0,error.New("no data");

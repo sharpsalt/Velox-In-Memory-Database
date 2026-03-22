@@ -29,3 +29,17 @@ func TestError(t *testing.T){
 		}
 	}
 }
+
+func TestInt64(t *testing.T){
+	cases:=map[string]string{
+		":0\r\n":0,
+		":1000\r\n":1000,
+	}
+
+	for k,v := range cases{
+		value,_:=core.Decode([]byte(k))
+		if v!=value{
+			t.Fail()
+		}
+	}
+}
