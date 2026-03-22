@@ -19,6 +19,17 @@ func readCommand(c net.Conn)(string,error){
 	return string(buf[:n]),nil
 }
 
+func respond(cmd string,c net.Conn) error{
+	//we passed give the command and given the socket connection, just writing it back over the socket
+	//like whatever we got we are sending it back to the client
+	if _,err:=c.Write([]byte(cmd)); err!=nil{
+		return err;
+	}
+	return nil
+	/*
+	Basically we are building an echo server like whatever we are getting from client, we are sending it back to him
+	*/
+}
 
 
 func RunSyncTCPServer(){
@@ -80,7 +91,7 @@ func RunSyncTCPServer(){
 					break
 				}
 				log.Println("command",cmd)
-				if err=responsd(cmd,c); err!=nil{
+				if err=respond(cmd,c); err!=nil{
 					log.Println("err write: ",err)
 				}
 			}
