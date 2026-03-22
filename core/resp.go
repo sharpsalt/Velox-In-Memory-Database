@@ -34,6 +34,22 @@ func readInt64(data []byte)(int64,int,error){
 	return value,pos+2,nil
 }
 
+//reads a RESP encoded string from data and returns 
+//the string, the delta, and the error
+
+func readBulkString(data []byte)(string,int,error){
+	//first character $
+	pos:=1
+
+	//reading the length of forrwading the pos by 
+	//the length of the integers + the first special character
+	len,delta:=readLength(data[pos:])
+	pos+=delta
+	
+	//reading 'len' bytes as string
+	return string(data[pos:(pos+len)]),pos+len+2,nil
+}
+
 func DecodeOne(data []byte)(interface{},int,error){
 	if len(data)==0{
 		return nil,0,error.New("no data");
