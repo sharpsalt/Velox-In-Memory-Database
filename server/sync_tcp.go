@@ -98,3 +98,24 @@ func RunSyncTCPServer(){
 		}
 	}
 }
+/*
+Since when you run it, you'll see that we can;t add more than 1 like even if we add then it will simply won't acknowledge us
+Now why does it happen
+because our server is single threaded, we have for loop inside for loop. so until our client disconnects 
+then your 2nd client will get the chance 
+
+
+So what actually happen when we do connect a redis client to the server
+redis server bhi to bhai TCP hi hoga so, so as sson as redis client is connected some message will exchange
+like jba connect hi krenge by 
+./src/redis-cli -p 7379
+thnn ye backend me mtlb dusre terminal pe jaise hi connect hoga to 
+command *1 
+$7
+COMMAND
+
+Now you might aks that what it actually is: so this is what redis serialization protocol is all about
+this is the command redis-cli sends to server when connection got established
+
+
+*/
