@@ -43,3 +43,16 @@ func TestInt64(t *testing.T){
 		}
 	}
 }
+
+func TestCulkStringDecode(t *Testing.T){
+	cases:=map[string]string{
+		"$5\r\nhello\r\n":"hello",
+		"$0\r\n\r\n":"",
+	}
+	for k,v := range cases{
+		value,_:=core.Decode([]byte(k))
+		if v!=value{
+			t.Fail()
+		}
+	}
+}
