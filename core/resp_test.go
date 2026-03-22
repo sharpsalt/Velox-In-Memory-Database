@@ -44,7 +44,7 @@ func TestInt64(t *testing.T){
 	}
 }
 
-func TestCulkStringDecode(t *Testing.T){
+func TestBulkStringDecode(t *Testing.T){
 	cases:=map[string]string{
 		"$5\r\nhello\r\n":"hello",
 		"$0\r\n\r\n":"",
