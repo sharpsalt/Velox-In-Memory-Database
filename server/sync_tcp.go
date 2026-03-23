@@ -1,5 +1,20 @@
+package server
 
-func readCommand(c net.Conn)(string,error){
+import(
+	"io"
+	"log"
+	"net"
+	"strconv"
+
+	"github.com/sharpsalt/Velox-In-Memory-Database/core"
+)
+
+type Config struct{
+	Host string
+	Port int
+}
+
+func readCommand(c net.Conn) (*core.Command, error) {
 	/*
 	Take the socket connection and basically fire the system call Read
 
@@ -13,17 +28,21 @@ func readCommand(c net.Conn)(string,error){
 	*/
 	var buf []byte=make([]byte,512)
 	n,err:=c.Read(buf[:])
-	if err!=nul{
-		return "",err
+	if err!=nil{
+		return nil,err
 	}
-	return string(buf[:n]),nil
+	val,err:=core.Decode(buf[:n])
+	if err!=nil{
+		return nil, err
+	}
+	return val.(*core.Command), nil
 }
 
-func respond(cmd string,c net.Conn) error{
+func respond(cmd *core.Command,c net.Conn)error{
 	//we passed give the command and given the socket connection, just writing it back over the socket
 	//like whatever we got we are sending it back to the client
-	if _,err:=c.Write([]byte(cmd)); err!=nil{
-		return err;
+	if _,err:=c.Write([]byte(cmd.Name)); err!=nil{
+		return err
 	}
 	return nil
 	/*
@@ -31,13 +50,10 @@ func respond(cmd string,c net.Conn) error{
 	*/
 }
 
+func RunSyncTCPServer(config *Config){
 
-func RunSyncTCPServer(){
-
-
-	log.Println("startign a synchronous TCP Server on", config.Host,config.Port)
-
-	var con_client int=0;
+	log.Println("startign a synchronous TCP Server on", config.Host, config.Port)
+	var con_client int=0
 	//this will hold the number of concurrent client that are connceted at the moment
 	/*
 	It is just some extra things like we want to know that yes we have this much m=concurrent server
@@ -48,52 +64,51 @@ func RunSyncTCPServer(){
 	Our server will start listening to the port that means any of the client can talk to server from the port upon which it is listening to
 	once  our server is started then i will run an infinite loop like you can see below
 	*/
-	lsnr,err:=net.Listen("top",config.Host+":"+strconv.Item(config.Port))
-	if(err!=nil){
+	lsnr,err:=net.Listen("tcp", config.Host+":"+strconv.Itoa(config.Port))
+	if err!=nil{
 		panic(err)
 	}
-
 	for{
 		/*
-		This Infinite for loop is to wait for infinite conncetion to get connected, so now any client can be able to connnect to server 
-		for us to tell that  hey i am waiting for a new conncetion to be connected so we are doing  this blocking call 
+		This Infinite for loop is to wait for infinite conncetion to get connected, so now any client can be able to connnect to server
+		for us to tell that  hey i am waiting for a new conncetion to be connected so we are doing  this blocking call
 		as soon as the client is connected we will move forward ele wr will thrown an error
 		*/
 		c,err:=lsnr.Accept()
-		if err:=nil{
+		if err!=nil{
 			panic(err)
 		}
-		//incrementing the number of concurrent clients 
+		//incrementing the number of concurrent clients
 		con_client+=1
-		log.Println("Client connected with address: ", c.RemoteAddr(), "concurrent clients", con_client)
-
+		log.Println("Client connected with address: ",c.RemoteAddr(),"concurrent clients",con_client)
 		/*
-		Another infinite loop for 
+		Another infinite loop for
 		we want our clients to continuously sends us command like put this key,get this key etc
 		*/
 		for{
-			//over the docket, continuously read the command and print it out 
+			//over the docket, continuously read the command and print it out
 			cmd,err:=readCommand(c)
 			/*
 			as the read command is done, this connect the connection else if the error is propogated back (like client is dissconneted), then err!=null
 			then at time i will close my socket connection, like i want to reduce the number of concurrent client whihc i am handling
 			and print krenge like earlier i have this much now i have these much
-
 			and if it is graceful termination, like where the client is sending th termination, i am simply breaking out of loop
 
-			and if my error is not nil then i wills imply tekk ok ye hai 
+			and if my error is not nil then i wills imply tekk ok ye hai
 			*/
 			if err!=nil{
 				c.Close()
 				con_client-=1
-				log.Println("client disconnected", c.RemoteAddr(), "concurrent clients", con_client);
+				log.Println("client disconnected",c.RemoteAddr(),"concurrent clients",con_client)
 				if err==io.EOF{
 					break
 				}
-				log.Println("command",cmd)
-				if err=respond(cmd,c); err!=nil{
-					log.Println("err write: ",err)
-				}
+				log.Println("error reading command",err)
+				continue
+			}
+			log.Println("command",cmd)
+			if err:=respond(cmd,c); err!=nil{
+				log.Println("error responding",err)
 			}
 		}
 	}

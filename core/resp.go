@@ -89,6 +89,11 @@ func readArray(data []byte)(interface{},int,error){
 	return elems,pos,nil
 }
 
+type Command struct{
+	Name string
+	Args []string
+}
+
 func DecodeOne(data []byte)(interface{},int,error){
 	if len(data)==0{
 		return nil,0,errors.New("no data");
@@ -109,7 +114,6 @@ func DecodeOne(data []byte)(interface{},int,error){
 	return nil,0,nil
 }
 
-
 func Decode(data []byte)(interface{},error){
 	/*
 	Decode function will take a slice of byte called as Data
@@ -123,6 +127,16 @@ func Decode(data []byte)(interface{},error){
 	}
 
 	value,_,err:=DecodeOne(data)
-	return value,err
+	if err!=nil{
+		return nil, err
+	}
+	array:=value.([]interface{})
+	command:=&Command{
+		Name:array[0].(string),
+	}
+	for _,v:=range array[1:]{
+		command.Args=append(command.Args, v.(string))
+	}
+	return command, nil
 }
 
