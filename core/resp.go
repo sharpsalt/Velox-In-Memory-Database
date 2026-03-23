@@ -62,9 +62,10 @@ func readLengh(data []byte)(int,int){
 		if !(b>='0' && b<='9'){
 			//os if the value is not in between 0 and 9 and then we do return , now the question would be why pos+2
 			// we did pos+2 because we want it to return and remove the \r\n by the end of it 
-			
 			return length,pos+2
 		}
+		length=length*10+int(b-'0');
+		//so here we are constructing the integer as whatever it is
 	}
 	return 0,0
 }
