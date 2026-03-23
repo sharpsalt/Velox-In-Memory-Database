@@ -1,3 +1,5 @@
+package core
+
 /*
 Basically encoding and decoding of values will go here
 
@@ -19,7 +21,8 @@ func readSimpleString(data []byte)(string,int,error){
 //the error string, the delta, and the error
 //It is almsot same as ReadSimpleString, only the difference is it starts with - instead of +
 func readError(data []byte)(string,int,error){
-	return readSimpleString(data)
+	s,d,_ := readSimpleString(data)
+	return s,d,errors.New(s)
 }
 
 //read a RESP encoded integer from data and returns 
@@ -94,7 +97,8 @@ func DecodeOne(data []byte)(interface{},int,error){
 	case '+':
 		return readSimpleString(data)
 	case '-':
-		return readError(data)
+		s,d,_ := readError(data)
+		return s,d,nil
 	case ':':
 		return readInt64(data)
 	case '$':
