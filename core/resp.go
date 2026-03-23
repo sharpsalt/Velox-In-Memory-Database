@@ -50,6 +50,25 @@ func readBulkString(data []byte)(string,int,error){
 	return string(data[pos:(pos+len)]),pos+len+2,nil
 }
 
+
+//read the length typicallly for the first integer of the string 
+//until hit by as non digit bytes and returns 
+//the integer and the delta=length*2(CRLF)
+func readLengh(data []byte)(int,int){
+	pos,length:=0.0
+
+	for pos := range data{
+		b:=data[pos]
+		if !(b>='0' && b<='9'){
+			//os if the value is not in between 0 and 9 and then we do return , now the question would be why pos+2
+			// we did pos+2 because we want it to return and remove the \r\n by the end of it 
+			
+			return length,pos+2
+		}
+	}
+	return 0,0
+}
+
 func DecodeOne(data []byte)(interface{},int,error){
 	if len(data)==0{
 		return nil,0,error.New("no data");
