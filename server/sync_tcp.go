@@ -16,7 +16,7 @@ type Config struct{
 	Port int
 }
 
-func readCommand(c net.Conn) (*core.Command, error) {
+func readCommand(c net.Conn) (*core.Rediscmd, error) {
 	/*
 	Take the socket connection and basically fire the system call Read
 
@@ -29,11 +29,17 @@ func readCommand(c net.Conn) (*core.Command, error) {
 	when we read it we put it into buffer and then, we get the number of bytes , if there is error we throw errer else we send it back 
 	*/
 	var buf []byte=make([]byte,512)
-	n,err:=c.Read(buf[:])
+	n,err:=c.Read(buf[:])//reading it in buffer from Client
 	if err!=nil{
 		return nil,err
 	}
-	val,err:=core.Decode(buf[:n])
+	// val,err:=core.Decode(buf[:n])
+	/*
+	and decoding it into an array of strings
+	when any redis cleint wants to issue a command to redis server then a command typically has 
+	root command and argument,all of them is sent to as an array of strings so if  am doing PUT key,value-> then it will sends as array of strings 
+	
+	*/
 	if err!=nil{
 		return nil, err
 	}

@@ -153,3 +153,22 @@ func Decode(data []byte)(interface{},error){
 	return value, nil
 }
 
+func DecodeArrayString(data []byte)([]string,error){
+	value,err:=Decode(data) //so here we decode normal function on the stream of bytes 
+	//and like it is all related to resp file because it is all related to redis serialization protocol
+	//and then we are typecasting it into array of interface and 
+	if err!=nil{
+		return nil,err
+	}
+	ts:=value.([]interface{})
+	tokens:=make([]string,len(ts))
+	//then here in tokens->we are initialising array of strings which is equal to len of interface 
+	//and then typecasting and then returning it 
+
+
+	//basically we are decosing it to array of string instead of array of interfaces 
+	for i := range tokens{
+		tokens[i]=ts[i].(string)
+	}
+	return tokens,nil
+}
