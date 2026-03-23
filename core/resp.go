@@ -70,6 +70,28 @@ func readLengh(data []byte)(int,int){
 	return 0,0
 }
 
+//read a RESP encoded array from data and returns 
+//the array, the delta, and the error
+func readArray(data []byte)(interface{},int,error){
+	//first character
+	pos:=1
+
+	//reading the length
+	count,delta:=readLength(data[pos:])
+	pos+=delta
+
+	var elems []interface{}=make([]interface{},count)
+	for i := range elems{
+		elem,delta,err:=DecodeOne(data[pos:])
+		if err!=nil{
+			return nil,0,err
+		}
+		elems[i]=elem
+		pos+=delta
+	}
+	return elems,pos,nil
+}
+
 func DecodeOne(data []byte)(interface{},int,error){
 	if len(data)==0{
 		return nil,0,error.New("no data");
