@@ -38,21 +38,35 @@ func readCommand(c net.Conn) (*core.Rediscmd, error) {
 	and decoding it into an array of strings
 	when any redis cleint wants to issue a command to redis server then a command typically has 
 	root command and argument,all of them is sent to as an array of strings so if  am doing PUT key,value-> then it will sends as array of strings 
-	
 	*/
-	if err!=nil{
-		return nil, err
+	tokens,err:=core.DecodeArrayString(buf[:n])
+	uf err!=nil{
+		return nil,err
 	}
-	return val.(*core.Command), nil
+	// return val.(*core.Command), nil
+	//once we had tokens we are creating redis command object and passing the root command in which tokens[0] will become command and rest will become the argument 
+	return &core.Rediscmd{
+		Cmd:strings.ToUpper(tokens[0]),
+		Args: tokens[1:],
+	},nil
 }
 
-func respond(cmd *core.Command,c net.Conn)error{
+func respondError(err error,c net.Conn){
+	//It write on TCP socket of stream of bytes where we are dping stream formatting 
+	//we know that whenever we send an error over TCP connection to the Redis cli, it needs to be encoded
+	//so it starts with - sign,then error string 
+	//string is converted to byte and responding back to client
+
+	c.Write([]byte(fmt.Sprintf("-%s\r\n",err)))
+}
+
+func respond(cmd *core.Rediscmd,c net.Conn){//Responding with connection
 	//we passed give the command and given the socket connection, just writing it back over the socket
 	//like whatever we got we are sending it back to the client
-	if _,err:=c.Write([]byte(cmd.Name)); err!=nil{
-		return err
+	err:=core.EvalAndRespond(cmd,c)//basically respond command is evaluating as well as responding
+	if err!=nil{
+		respondError(err,c)
 	}
-	return nil
 	/*
 	Basically we are building an echo server like whatever we are getting from client, we are sending it back to him
 	*/
