@@ -172,3 +172,17 @@ func DecodeArrayString(data []byte)([]string,error){
 	}
 	return tokens,nil
 }
+
+//Encode function take any value and converts it into bytes, which you can send over streams of socket
+func Encode(value interface{},isSimple bool)[]byte{
+	switch v:=value.(type){
+	case string:
+		if isSimple{
+			//agar simplestring me chahiye to aise krdega 
+			return []byte(fmt.Sprintf("+%s\r\n",v))
+		}
+		//if it is not a simple string which means it is a bulk string
+		return []byte(fmt.Sprintf("$%d\r\n%s\r\n",len(v),v))
+	}
+	return []byte{}
+}
