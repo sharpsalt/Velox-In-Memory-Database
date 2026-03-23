@@ -2,6 +2,7 @@
 Basically encoding and decoding of values will go here
 
 */
+import "errors"
 
 //read a RESP encoded simple string from the data and returns 
 //the string, the data, and the error 
@@ -43,31 +44,24 @@ func readBulkString(data []byte)(string,int,error){
 
 	//reading the length of forrwading the pos by 
 	//the length of the integers + the first special character
-	len,delta:=readLength(data[pos:])
+	length,delta:=readLength(data[pos:])
 	pos+=delta
 	
 	//reading 'len' bytes as string
-	return string(data[pos:(pos+len)]),pos+len+2,nil
+	return string(data[pos:(pos+length)]),pos+length+2,nil
 }
 
 
 //read the length typicallly for the first integer of the string 
 //until hit by as non digit bytes and returns 
 //the integer and the delta=length*2(CRLF)
-func readLengh(data []byte)(int,int){
-	pos,length:=0.0
+func readLength(data []byte)(int,int){
+	pos,length:=0,0
 
-	for pos := range data{
-		b:=data[pos]
-		if !(b>='0' && b<='9'){
-			//os if the value is not in between 0 and 9 and then we do return , now the question would be why pos+2
-			// we did pos+2 because we want it to return and remove the \r\n by the end of it 
-			return length,pos+2
-		}
-		length=length*10+int(b-'0');
-		//so here we are constructing the integer as whatever it is
+	for ; data[pos]!='\r'; pos++{
+		length=length*10+int(data[pos]-'0');
 	}
-	return 0,0
+	return length,pos+2
 }
 
 //read a RESP encoded array from data and returns 
@@ -94,7 +88,7 @@ func readArray(data []byte)(interface{},int,error){
 
 func DecodeOne(data []byte)(interface{},int,error){
 	if len(data)==0{
-		return nil,0,error.New("no data");
+		return nil,0,errors.New("no data");
 	}
 	switch data[0]{
 	case '+':
