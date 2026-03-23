@@ -122,21 +122,34 @@ func Decode(data []byte)(interface{},error){
 	So we may get extremely large slice of byte but the decodeOne willl decode the first RESP value of it 
 	DecodeOne will decode each of it and return value,int,and optional error.
 	*/
-	if len(data)==0{
-		return nil,errors.New("no data")
+	if len(data) == 0 {
+		return nil, errors.New("no data")
 	}
 
-	value,_,err:=DecodeOne(data)
-	if err!=nil{
+	value, _, err := DecodeOne(data)
+	if err != nil {
 		return nil, err
 	}
-	array:=value.([]interface{})
-	command:=&Command{
-		Name:array[0].(string),
+
+	// Only try to convert to command if the value is an array
+	if array, ok := value.([]interface{}); ok {
+		if len(array) == 0 {
+			return &Command{}, nil
+		}
+
+		if name, ok := array[0].(string); ok {
+			command := &Command{
+				Name: name,
+			}
+			for _, v := range array[1:] {
+				if arg, ok := v.(string); ok {
+					command.Args = append(command.Args, arg)
+				}
+			}
+			return command, nil
+		}
 	}
-	for _,v:=range array[1:]{
-		command.Args=append(command.Args, v.(string))
-	}
-	return command, nil
+
+	return value, nil
 }
 
