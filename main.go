@@ -25,7 +25,7 @@ func setupFlag(){
 func main(){
 	setupFlag() //we will setup the flags firt
 	log.Println("hello!! is it really running")
-	server.RunSyncTCPServer(config)
+	server.RunAsyncTCPServer(config)
 	/*
 	I will be running Synchronous TCP Server means i iwll be starting the TCP connection on give port synchronously
 	*/
