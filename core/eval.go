@@ -26,7 +26,7 @@ func evalPING(args []string,c io.ReadWriter) error{
 }
 
 // func EvalAndRespond(cmd *Rediscmd,c net.Conn)error{
-func EvalAndRespong(cmd *RedisCmd, c io.ReadWriter) error{
+func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter) error{
 	//It's job is like depending on what job is sent to us
 	//we trigger the corresponding eval function
 
