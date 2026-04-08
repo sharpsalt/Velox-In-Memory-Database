@@ -1,5 +1,10 @@
+import (
+	"errors"
+	"io"
+)
 
-func evalPING(args []string,c net.Conn)error{
+// func evalPING(args []string,c net.Conn)error{
+func evalPING(args []string,c io.ReadWriter) error{
 	var b []byte 
 
 	if len(args)>=2{
@@ -20,7 +25,8 @@ func evalPING(args []string,c net.Conn)error{
 	return err 
 }
 
-func EvalAndRespond(cmd *Rediscmd,c net.Conn)error{
+// func EvalAndRespond(cmd *Rediscmd,c net.Conn)error{
+func EvalAndRespong(cmd *RedisCmd, c io.ReadWriter) error{
 	//It's job is like depending on what job is sent to us
 	//we trigger the corresponding eval function
 
