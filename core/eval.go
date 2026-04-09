@@ -97,6 +97,8 @@ func evalGET(args []string,c io.ReadWriter) error{
 	c.Write(Encode(obj.Value,false))
 	return nil
 }
+//a nil is nothing but a string with -1 length
+//so instead of writing again and again we just created constant object as RESP_NIL and referncing it everywhere
 
 // func EvalAndRespond(cmd *Rediscmd,c net.Conn)error{
 func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter) error{
