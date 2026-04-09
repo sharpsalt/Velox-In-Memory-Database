@@ -1,6 +1,8 @@
 import (
 	"errors"
 	"io"
+	"strconv"
+	"time"
 )
 
 // func evalPING(args []string,c net.Conn)error{
@@ -63,6 +65,34 @@ func evalSET(args []string, io.ReadWriter) error{
 	//so we will create a new Object
 	Put(key,NewObj(value,exDurationMs))
 	c.Write([]byte("+OK\r\n"))
+	return nil
+}
+
+func evalGET(args []string,c io.ReadWriter) error{
+	if len(args)!=1{
+		return errors.New("(error) ERR wrong number of argments is passed bro")
+	}
+
+	var key string=args[0]
+
+	//get the key from the hash table 
+	obj:=Get(key)//as we ahve seen humog hash table of string as key and value as object banaye the 
+
+	//if key does not exist, return resp encoded nil
+	if obj==nil{
+		c.Write(RESP_NIL)
+		return nil
+	}
+
+	//if key already expired then return nil
+	if obj.ExpiresAt!=-1 && obj.ExpiresAt<=time.Now().UnixMilli(){
+		c.Write(RESP_NIL)
+		return nil
+	}
+
+
+	//return te RESP encoded value 
+	c.Write(Encode(obj.Value,false))
 	return nil
 }
 
