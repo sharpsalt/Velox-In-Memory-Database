@@ -100,6 +100,32 @@ func evalGET(args []string,c io.ReadWriter) error{
 //a nil is nothing but a string with -1 length
 //so instead of writing again and again we just created constant object as RESP_NIL and referncing it everywhere
 
+
+func evalTTL(args []string,c io.ReadWriter) error{
+	if len(args)!=1{
+		return errors.New("(error) ERR wrong number of argumenst for 'get' command")
+	}
+
+	var key string=args[0]
+
+	obj:=Get(key)
+
+	//if the key does not exist, return RESP encoded -2 denoting key does not exist
+	if obj==nil{
+		c.Write([] byte(":-2\r\n"))
+		return nil
+	}
+
+	//if object exist, but no expiration is set on it then send -1
+	if obj.ExpiresAt==-1{
+		c.Write([]byte(":-1\r\n"))
+		return nil
+	}
+
+	
+
+}
+
 // func EvalAndRespond(cmd *Rediscmd,c net.Conn)error{
 func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter) error{
 	//It's job is like depending on what job is sent to us
