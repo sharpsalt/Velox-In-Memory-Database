@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+var RESP_NIL []byte=[]byte("$-1\r\n")
+
 // func evalPING(args []string,c net.Conn)error{
 func evalPING(args []string,c io.ReadWriter) error{
 	var b []byte 
