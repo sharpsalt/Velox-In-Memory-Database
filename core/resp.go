@@ -4,7 +4,10 @@ package core
 Basically encoding and decoding of values will go here
 
 */
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 //read a RESP encoded simple string from the data and returns 
 //the string, the data, and the error 
@@ -183,10 +186,6 @@ func Encode(value interface{},isSimple bool)[]byte{
 		}
 		//if it is not a simple string which means it is a bulk string
 		return []byte(fmt.Sprintf("$%d\r\n%s\r\n",len(v),v))
-	case int64:
-		return []byte(fmt.Sprintf(":%d\r\n",v))
-	default:
-		return RESP_NIL
 	}
 	// return []byte{}
 }
