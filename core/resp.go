@@ -183,8 +183,12 @@ func Encode(value interface{},isSimple bool)[]byte{
 		}
 		//if it is not a simple string which means it is a bulk string
 		return []byte(fmt.Sprintf("$%d\r\n%s\r\n",len(v),v))
+	case int64:
+		return []byte(fmt.Sprintf(":%d\r\n",v))
+	default:
+		return RESP_NIL
 	}
-	return []byte{}
+	// return []byte{}
 }
 
 /*
