@@ -122,7 +122,18 @@ func evalTTL(args []string,c io.ReadWriter) error{
 		return nil
 	}
 
-	
+	//compute the time remaining for the key to expire and 
+	//return the RESP encoded form of it 
+	durationMs:=obj.ExpiresAt-time.Now().UnixMilli()
+
+	//if key expired i.e key does not exist hence return -2
+	if durationMS<0{
+		c.Write([]byte(":-2\r\n"))
+		return nil
+	}
+
+	c.Write(Encode(int64(durationMS/1000),false))
+	return nil
 
 }
 
