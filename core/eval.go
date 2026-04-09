@@ -25,6 +25,47 @@ func evalPING(args []string,c io.ReadWriter) error{
 	return err 
 }
 
+func evalSET(args []string, io.ReadWriter) error{
+	if len(args)<=1{
+		//iska mtlb we are not passing required arguemnts
+		return errors.New("(error) ERR wrong number of arguments for 'set' commands")
+	}
+
+	var key,value string
+	var exDurationMs int64=-1//as we know ki default value of expiration is -1
+
+	key,value=args[0],args[1]
+
+	for i:=2;i<len(args);i++{
+		//as we are only implementing expiration as of now par SET functions implements a lot of other options too
+		//since i got the key and value,everything else is just other
+		switch args[i]{
+		case: "EX","ex":
+			//means users has passed some expiry
+			//so we are doing i++ to know ki use r kya pass kiya hao
+			i++;
+			if i==len(args){
+				//mtlb suser kuch pass nhi kiya 
+				return errors.New("(error) ERR syntax error")
+			}
+
+			exDurationSec,err:=strconv.ParseInt(args[3],10,64)
+			if err!=nil{
+				return errors.New("(error) ERR valye is not an integerr or out of range ")
+			}
+			exDurationMs=exDurationSec*1000//because we are operation ms granuality
+		default:
+			return errors.New("(error) ERR syntax error")
+		}
+	}
+
+	//after this we have key,value set and it is ptional for expiration
+	//so we will create a new Object
+	Put(key,NewObj(value,exDurationMs))
+	c.Write([]byte("+OK\r\n"))
+	return nil
+}
+
 // func EvalAndRespond(cmd *Rediscmd,c net.Conn)error{
 func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter) error{
 	//It's job is like depending on what job is sent to us
