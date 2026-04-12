@@ -1,4 +1,5 @@
 package core
+
 import (
 	"errors"
 	"io"
@@ -39,7 +40,7 @@ func evalSET(args []string, io.ReadWriter) error{
 	var key,value string
 	var exDurationMs int64=-1//as we know ki default value of expiration is -1
 
-	key,value=args[0],args[1]
+key,value=args[0],args[1]
 
 	for i:=2;i<len(args);i++{
 		//as we are only implementing expiration as of now par SET functions implements a lot of other options too
@@ -137,6 +138,8 @@ func evalTTL(args []string,c io.ReadWriter) error{
 	return nil
 
 }
+
+
 
 // func EvalAndRespond(cmd *Rediscmd,c net.Conn)error{
 func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter) error{
