@@ -4,7 +4,10 @@ package core
 Basically encoding and decoding of values will go here
 
 */
-import "errors"
+import (
+"errors"
+"fmt"
+)
 
 //read a RESP encoded simple string from the data and returns 
 //the string, the data, and the error 
@@ -14,7 +17,7 @@ func readSimpleString(data []byte)(string,int,error){
 	for ; data[pos]!='\r';pos++{
 	}
 
-	return string(data[1:pos]),pos+2,nil
+    return string(data[1:pos]),pos+2,nil
 }
 
 //read a RESP encoded error from data and returns 
@@ -59,7 +62,7 @@ func readBulkString(data []byte)(string,int,error){
 //until hit by as non digit bytes and returns 
 //the integer and the delta=length*2(CRLF)
 func readLength(data []byte)(int,int){
-	pos,length:=0,0
+pos,length:=0,0
 
 	for ; data[pos]!='\r'; pos++{
 		length=length*10+int(data[pos]-'0');
@@ -184,23 +187,5 @@ func Encode(value interface{},isSimple bool)[]byte{
 		//if it is not a simple string which means it is a bulk string
 		return []byte(fmt.Sprintf("$%d\r\n%s\r\n",len(v),v))
 	}
-	return []byte{}
+	// return []byte{}
 }
-
-/*
-Now how to compare how fats our server is?
-->Redis itself comes with benchmarking tool so we will use that 
-./redis-benchmark -n 10000 -t ping_mbulk -c 1 -h localhost -p 6379 ->Normal redis server
-
-Now if i change the port accprding to our server 
-./redis-benchmark -n 10000 -t ping_mbulk -c 1 -h localhost -p 7379 ->Ye hi hai
-
-basically we are suing redis unit test cases to check how correct our test is going
-local machine pe bar bar me alag alag aayega qki it is also dependent upon process, like kab konsa process execute horahauspe bhi depend krta 
-
-
-one thing which i also can do that is to use docker for benchmarking like go to docker, pull an linux alpine image and run on top of it to get the correct value
-else kv kv aisa bhi benchmark shi rehta hai 
-
-and our server is not concurrent as of now, we will make  it concurrent ab
-*/

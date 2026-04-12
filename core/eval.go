@@ -1,3 +1,5 @@
+package core
+
 import (
 	"errors"
 	"io"
@@ -38,7 +40,7 @@ func evalSET(args []string, io.ReadWriter) error{
 	var key,value string
 	var exDurationMs int64=-1//as we know ki default value of expiration is -1
 
-	key,value=args[0],args[1]
+key,value=args[0],args[1]
 
 	for i:=2;i<len(args);i++{
 		//as we are only implementing expiration as of now par SET functions implements a lot of other options too
@@ -99,6 +101,45 @@ func evalGET(args []string,c io.ReadWriter) error{
 }
 //a nil is nothing but a string with -1 length
 //so instead of writing again and again we just created constant object as RESP_NIL and referncing it everywhere
+
+
+func evalTTL(args []string,c io.ReadWriter) error{
+	if len(args)!=1{
+		return errors.New("(error) ERR wrong number of argumenst for 'get' command")
+	}
+
+	var key string=args[0]
+
+	obj:=Get(key)
+
+	//if the key does not exist, return RESP encoded -2 denoting key does not exist
+	if obj==nil{
+		c.Write([] byte(":-2\r\n"))
+		return nil
+	}
+
+	//if object exist, but no expiration is set on it then send -1
+	if obj.ExpiresAt==-1{
+		c.Write([]byte(":-1\r\n"))
+		return nil
+	}
+
+	//compute the time remaining for the key to expire and 
+	//return the RESP encoded form of it 
+	durationMs:=obj.ExpiresAt-time.Now().UnixMilli()
+
+	//if key expired i.e key does not exist hence return -2
+	if durationMS<0{
+		c.Write([]byte(":-2\r\n"))
+		return nil
+	}
+
+	c.Write(Encode(int64(durationMS/1000),false))
+	return nil
+
+}
+
+
 
 // func EvalAndRespond(cmd *Rediscmd,c net.Conn)error{
 func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter) error{
