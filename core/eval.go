@@ -195,6 +195,12 @@ func evalEXPIRE(args []string)[]byte{
 	return RESP_ONE
 }
 
+//TODO: Make it async by forking a new process
+func evalBGREWRITEAOF(args []string) []nyte{
+	DumpAllAOF()
+	return RESP_OK
+}
+
 // func EvalAndRespond(cmd *Rediscmd,c net.Conn)error{
 func EvalAndRespond(cmds *RedisCmds, c io.ReadWriter){
 	//It's job is like depending on what job is sent to us
@@ -206,19 +212,21 @@ func EvalAndRespond(cmds *RedisCmds, c io.ReadWriter){
 	for _,cmd:=range cmds{
 		switch cmd.Cmd{
 	case "PING":
-		buf.Write(evalPING(cmd.Args,c))
+		buf.Write(evalPING(cmd.Args))
 	case "SET":
-		buf.Write(evalSET(cmd.Args,c))
+		buf.Write(evalSET(cmd.Args))
 	case "GET":
-		buf.Write(evalGET(cmd.Args,c))
+		buf.Write(evalGET(cmd.Args))
 	case "TTL":
-		buf.Write(evalTTL(cmd.Args,c))
+		buf.Write(evalTTL(cmd.Args))
 	case "DEL":
-		buf.Write(evalDEL(cmd.Args,c))
+		buf.Write(evalDEL(cmd.Args))
 	case "EXPIRE":
-		buf.Write(evalEXPIRE(cmd.Args,c))
+		buf.Write(evalEXPIRE(cmd.Args))
+	case: "BGREWRITEAOF":
+		buf.Write(evalBGREWRITEAOF(cmd.Args))
 	default:
-		buf.Write(evalPING(cmd.Args,c))
+		buf.Write(evalPING(cmd.Args))
 	}
 	/*
 	Earlier we used to return and like we used to pass io.ReadWriter but now instead of that the eval function that we ahev si returning the output
