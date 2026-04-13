@@ -5,8 +5,9 @@ Basically encoding and decoding of values will go here
 
 */
 import (
-"errors"
-"fmt"
+	"bytes"
+	"errors"
+	"fmt"
 )
 
 //read a RESP encoded simple string from the data and returns 
@@ -168,51 +169,72 @@ func Decode(data []byte)([]interface{},error){
 		values=append(values,value)
 	}
 
-	return value,nil
+	return values, nil
 }
 
-func DecodeArrayString(data []byte)([]string,error){
-	value,err:=Decode(data) //so here we decode normal function on the stream of bytes 
+func DecodeArrayString(data []byte) ([]string, error){
+	values, err := Decode(data) //so here we decode normal function on the stream of bytes 
 	//and like it is all related to resp file because it is all related to redis serialization protocol
-	//and then we are typecasting it into array of interface and 
-	if err!=nil{
-		return nil,err
+	//Decode returns []interface{} directly
+	if err != nil{
+		return nil, err
 	}
-	ts:=value.([]interface{})
-	tokens:=make([]string,len(ts))
+	
+	// values is already []interface{}, just convert to strings
+	tokens := make([]string, len(values))
 	//then here in tokens->we are initialising array of strings which is equal to len of interface 
-	//and then typecasting and then returning it 
+	//and then typecasting and then returning it
 
 
-	//basically we are decosing it to array of string instead of array of interfaces 
+	//basically we are decoding it to array of string instead of array of interfaces 
 	for i := range tokens{
-		tokens[i]=ts[i].(string)
+		tokens[i] = values[i].(string)
 	}
-	return tokens,nil
+	return tokens, nil
+}
+
+func toArrayString(arr []interface{}) ([]string, error) {
+	//helper function to convert array of interface{} to array of strings
+	tokens := make([]string, len(arr))
+	for i := range arr{
+		tokens[i] = arr[i].(string)
+	}
+	return tokens, nil
+}
+
+// ToArrayString is the exported version of toArrayString
+func ToArrayString(arr []interface{}) ([]string, error) {
+	return toArrayString(arr)
 }
 
 //Encode function take any value and converts it into bytes, which you can send over streams of socket
-func Encode(value interface{},isSimple bool)[]byte{
-	switch v:=value.(type){
+func encodeString(s string) []byte {
+	//this is a helper function to encode a single string as bulk string
+	return []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(s), s))
+}
+
+func Encode(value interface{}, isSimple bool) []byte{
+	switch v := value.(type){
 	case string:
 		if isSimple{
 			//agar simplestring me chahiye to aise krdega 
-			return []byte(fmt.Sprintf("+%s\r\n",v))
+			return []byte(fmt.Sprintf("+%s\r\n", v))
 		}
 		//if it is not a simple string which means it is a bulk string
-		return []byte(fmt.Sprintf("$%d\r\n%s\r\n",len(v),v))
-	case int,int9,int16,int32,int64:
-		return []byte(fmt.Sprintf(":%d\r\n",v))	}
+		return []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(v), v))
+	case int, int8, int16, int32, int64:
+		return []byte(fmt.Sprintf(":%d\r\n", v))
 	case []string:
 		var b []byte
-		buf:=bytes.NewBuffer(b)
-		for _,b:=range value.([]string){
-			buf.Write(encodeString(b))
+		buf := bytes.NewBuffer(b)
+		for _, str := range value.([]string){
+			buf.Write(encodeString(str))
 		}
-		return []byte(fmt.Sprintf("*%d\r\n%s",len(v),buf.Bytes()))
+		return []byte(fmt.Sprintf("*%d\r\n%s", len(v), buf.Bytes()))
 	case error:
-		return []byte(fmt.Sprintf("-%s\r\n",v))
+		return []byte(fmt.Sprintf("-%s\r\n", v))
 	default:
 		return RESP_NIL
 	// return []byte{}
+	}
 }

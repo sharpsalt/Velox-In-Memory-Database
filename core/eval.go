@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"strconv"
@@ -19,18 +20,18 @@ func evalPING(args []string) []byte{
 	//eariler we used to return an error , but now we return a slice of bytes(which is the actual response)
 	var b []byte 
 
-	if len(args)>=2{
+	if len(args) >= 2{
 		//means if the redis cli passes us more than 1 arguments then this will invoke 
-		return Encode(errors.New("ERR wrong number of arguments for 'ping' command"))
+		return Encode(errors.New("ERR wrong number of arguments for 'ping' command"), false)
 	}
 
-	if len(args)==0{
+	if len(args) == 0{
 		//we will encode it into RESP
 		//encode function is to take the raw type and convert it to another encoded resp format
-		//Because server has to respond in resp format so the server will also do get the thing 
-		b=Encode("PONG",true)
+		//Because server has to respond in resp format so the server will also do get the thing
+		b = Encode("PONG", true)
 	}else{
-		b=Encode(args[0],false)
+		b = Encode(args[0], false)
 	}
 
 	// _,err:=c.Write(b)
@@ -39,42 +40,42 @@ func evalPING(args []string) []byte{
 
 func evalSET(args []string) []byte{
 	//similarly for evalSET
-	if len(args)<=1{
+	if len(args) <= 1{
 		//iska mtlb we are not passing required arguemnts
-		return Encode(errors.New("(error) ERR wrong number of arguments for 'set' commands"),false)
+		return Encode(errors.New("(error) ERR wrong number of arguments for 'set' commands"), false)
 	}
 
-	var key,value string
-	var exDurationMs int64=-1//as we know ki default value of expiration is -1
+	var key, value string
+	var exDurationMs int64 = -1//as we know ki default value of expiration is -1
 
-    key,value=args[0],args[1]
+	key, value = args[0], args[1]
 
-	for i:=2;i<len(args);i++{
+	for i := 2; i < len(args); i++{
 		//as we are only implementing expiration as of now par SET functions implements a lot of other options too
 		//since i got the key and value,everything else is just other
 		switch args[i]{
-		case: "EX","ex":
+		case "EX", "ex":
 			//means users has passed some expiry
 			//so we are doing i++ to know ki use r kya pass kiya hao
-			i++;
-			if i==len(args){
+			i++
+			if i == len(args){
 				//mtlb suser kuch pass nhi kiya 
-				return Encode(errors.New("(error) ERR syntax error"),false)
+				return Encode(errors.New("(error) ERR syntax error"), false)
 			}
 
-			exDurationSec,err:=strconv.ParseInt(args[3],10,64)
-			if err!=nil{
-				return Encode(errors.New("(error) ERR valye is not an integerr or out of range "),false)
+			exDurationSec, err := strconv.ParseInt(args[i], 10, 64)
+			if err != nil{
+				return Encode(errors.New("(error) ERR valye is not an integerr or out of range "), false)
 			}
-			exDurationMs=exDurationSec*1000//because we are operation ms granuality
+			exDurationMs = exDurationSec * 1000//because we are operation ms granuality
 		default:
-			return Encode(errors.New("(error) ERR syntax error"),false)
+			return Encode(errors.New("(error) ERR syntax error"), false)
 		}
 	}
 
 	//after this we have key,value set and it is ptional for expiration
 	//so we will create a new Object
-	Put(key,NewObj(value,exDurationMs))
+	Put(key, NewObj(value, exDurationMs))
 	// c.Write([]byte("+OK\r\n"))
 	// return nil
 	return RESP_OK
@@ -145,7 +146,7 @@ func evalTTL(args []string) []byte{
 	durationMs:=obj.ExpiresAt-time.Now().UnixMilli()
 
 	//if key expired i.e key does not exist hence return -2
-	if durationMS<0{
+	if durationMs < 0{
 		// c.Write([]byte(":-2\r\n"))
 		// return nil
 		return RESP_MINUS_2
@@ -153,41 +154,41 @@ func evalTTL(args []string) []byte{
 
 	// c.Write(Encode(int64(durationMS/1000),false))
 	// return nil
-	return Encode(int64(durationMS/1000),false)
+	return Encode(int64(durationMs/1000), false)
 }
 
 func evalDEL(args []string) []byte{
-	var countDeleted int=0
-	for _,key :=range args{
-		of ok:=Del(key);ok{
+	var countDeleted int = 0
+	for _, key := range args{
+		if ok := Del(key); ok{
 			countDeleted++
 		}
 	}
-	return Encode(countDeleted,false)
+	return Encode(countDeleted, false)
 	// return nil
 }
 
-func evalEXPIRE(args []string)[]byte{
-	if len(args)<=1{
-		return Encode(errors.New("(error) ERR wrong number of arguments for 'expire' command"),false)
+func evalEXPIRE(args []string) []byte{
+	if len(args) <= 1{
+		return Encode(errors.New("(error) ERR wrong number of arguments for 'expire' command"), false)
 	}
 
-	var key string=args[0]
-	exDurationSecerr:=strconv.ParseInt(args[1],10,64)
-	if err!=nil{
-		return Encode(errors.New("(error) ERR value is nt an integer or out of range"),false)
+	var key string = args[0]
+	exDurationSec, err := strconv.ParseInt(args[1], 10, 64)
+	if err != nil{
+		return Encode(errors.New("(error) ERR value is nt an integer or out of range"), false)
 	}
 
-	obj:=Get(key)
+	obj := Get(key)
 
 	//0 if the timeout was not set: e.g Key doesn't exits, or operation skipped due to provided argument
-	if obj==nil{
+	if obj == nil{
 		// c.Write([]byte(":0\r\n")) //qki operation successful nhi hua
 		// return nil
 		return RESP_ZERO
 	}
 
-	obj.ExpiresAt=time.Now().UnixMilli()+exDurationSec*1000
+	obj.ExpiresAt = time.Now().UnixMilli() + exDurationSec*1000
 
 	//1 print krenge if the timeout was set
 	// c.Write([]byte(":1\r\n"))
@@ -196,42 +197,43 @@ func evalEXPIRE(args []string)[]byte{
 }
 
 //TODO: Make it async by forking a new process
-func evalBGREWRITEAOF(args []string) []nyte{
+func evalBGREWRITEAOF(args []string) []byte{
 	DumpAllAOF()
 	return RESP_OK
 }
 
 // func EvalAndRespond(cmd *Rediscmd,c net.Conn)error{
-func EvalAndRespond(cmds *RedisCmds, c io.ReadWriter){
+func EvalAndRespond(cmds []*RedisCmd, c io.ReadWriter) error{
 	//It's job is like depending on what job is sent to us
 	//we trigger the corresponding eval function
 
-	var response []bytes
-	buf:=bytes.NewBuffer(response) // this is where we are buffering all 
+	var response []byte
+	buf := bytes.NewBuffer(response) // this is where we are buffering all 
 	//our logic didn't chnaged, but the way we are consuming has changed
-	for _,cmd:=range cmds{
+	for _, cmd := range cmds{
 		switch cmd.Cmd{
-	case "PING":
-		buf.Write(evalPING(cmd.Args))
-	case "SET":
-		buf.Write(evalSET(cmd.Args))
-	case "GET":
-		buf.Write(evalGET(cmd.Args))
-	case "TTL":
-		buf.Write(evalTTL(cmd.Args))
-	case "DEL":
-		buf.Write(evalDEL(cmd.Args))
-	case "EXPIRE":
-		buf.Write(evalEXPIRE(cmd.Args))
-	case: "BGREWRITEAOF":
-		buf.Write(evalBGREWRITEAOF(cmd.Args))
-	default:
-		buf.Write(evalPING(cmd.Args))
+		case "PING":
+			buf.Write(evalPING(cmd.Args))
+		case "SET":
+			buf.Write(evalSET(cmd.Args))
+		case "GET":
+			buf.Write(evalGET(cmd.Args))
+		case "TTL":
+			buf.Write(evalTTL(cmd.Args))
+		case "DEL":
+			buf.Write(evalDEL(cmd.Args))
+		case "EXPIRE":
+			buf.Write(evalEXPIRE(cmd.Args))
+		case "BGREWRITEAOF":
+			buf.Write(evalBGREWRITEAOF(cmd.Args))
+		default:
+			buf.Write(evalPING(cmd.Args))
+		}
+		/*
+		Earlier we used to return and like we used to pass io.ReadWriter but now instead of that the eval function that we ahev si returning the output
+		but here we are putting it in buffer
+		*/
 	}
-	/*
-	Earlier we used to return and like we used to pass io.ReadWriter but now instead of that the eval function that we ahev si returning the output
-	but here we are putting it in buffer
-	*/
-	}
-	c.Write(buf.Bytes())
+	_, err := c.Write(buf.Bytes())
+	return err
 }
