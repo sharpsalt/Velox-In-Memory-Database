@@ -1,6 +1,10 @@
 package core 
 
-import "time"
+import (
+	"time"
+	
+	"github.com/sharpsalt/Velox-In-Memory-Database/config"
+)
 
 var store map[string]*Obj
 //the best datastrcuture to hold key value is hash table so we are using it
@@ -24,11 +28,11 @@ func NewObj(value interface{},DurationMs int64) *Obj{
 
 	return &Obj{
 		Value: value,
-		ExpiresAt: expiresAt
+		ExpiresAt: expiresAt,
 	}
 }
 
-func Put(k string,obj *Obj){
+func Put(k string, obj *Obj){
 	// store[k]=obj
 	/*
 	When we would be triggering eviction? when we hit the memory
@@ -37,18 +41,18 @@ func Put(k string,obj *Obj){
 
 	while puttng it , we first check if the length is more than what is required then evict kro 
 	*/
-	if len(store)>=config.KeysLimit{
+	if len(store) >= config.KeysLimit{
 		evict()
 	}
-	store[k]=obj
+	store[k] = obj
 }
 
 func Get(k string) *Obj{
-    v:=store[k]
+	v := store[k]
 	/*we check for the expiration and if it is already not deleted then we have to delete it 
 	*/
-	if v!=nil{
-		if v.ExpiresAt<=time.Now().UnixMilli(){
+	if v != nil{
+		if v.ExpiresAt <= time.Now().UnixMilli(){
 			//this is like a lazy deletion
 			/*
 			If a key is accessed and fund to be expired , then it deleted else it is not deleted

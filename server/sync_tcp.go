@@ -16,7 +16,7 @@ type Config struct{
 	Port int
 }
 
-func readCommand(c net.Conn) (*core.Rediscmd, error) {
+func readCommand(c net.Conn) ([]*core.RedisCmd, error) {
 	/*
 	Take the socket connection and basically fire the system call Read
 
@@ -28,10 +28,10 @@ func readCommand(c net.Conn) (*core.Rediscmd, error) {
 	if there is nothing taht is coming from my lcient then it is a blocking call, until i get somehting from client 
 	when we read it we put it into buffer and then, we get the number of bytes , if there is error we throw errer else we send it back 
 	*/
-	var buf []byte=make([]byte,512)
-	n,err:=c.Read(buf[:])//reading it in buffer from Client
-	if err!=nil{
-		return nil,err
+	var buf []byte = make([]byte, 512)
+	n, err := c.Read(buf[:])//reading it in buffer from Client
+	if err != nil{
+		return nil, err
 	}
 	/*
 	Pipelining-> me ka
@@ -60,46 +60,48 @@ func readCommand(c net.Conn) (*core.Rediscmd, error) {
 	// 	Args: tokens[1:],
 	// },nil
 
-	var cmds []*core.RedisCmd=make([]*core.RedisCmd,0)
-	for _,value:=range values{
-		tokens,err:=toArrayString(value.([]interface{}))
-		if err!=nil{
-			return nil,err
+	var cmds []*core.RedisCmd = make([]*core.RedisCmd, 0)
+	for _, value := range values{
+		tokens, err := core.ToArrayString(value.([]interface{}))
+		if err != nil{
+			return nil, err
 		}
 		//so here are we 
-		cmds=append(cmds,&core.RedisCmd{
-			Cmd:strings.ToUpper(tokens[0])
-			Args:tokens[1:],
+		cmds = append(cmds, &core.RedisCmd{
+			Cmd:  strings.ToUpper(tokens[0]),
+			Args: tokens[1:],
 		})
 	}
-	return cmds,nil
+	return cmds, nil
 }
 
-func respondError(err error,c net.Conn){
+func respondError(err error, c io.ReadWriter){
 	//It write on TCP socket of stream of bytes where we are dping stream formatting 
 	//we know that whenever we send an error over TCP connection to the Redis cli, it needs to be encoded
-	//so it starts with - sign,then error string 
+	//so it starts with - sign,then error string
 	//string is converted to byte and responding back to client
 
-	c.Write([]byte(fmt.Sprintf("-%s\r\n",err)))
+	c.Write([]byte(fmt.Sprintf("-%s\r\n", err)))
 }
 
-func respond(cmd *core.Rediscmds,c io.ReadWriter){//Responding with connection
+func respond(cmds []*core.RedisCmd, c io.ReadWriter) error{//Responding with connection
 	//we passed give the command and given the socket connection, just writing it back over the socket
 	//like whatever we got we are sending it back to the client
-	err:=core.EvalAndRespond(cmds,c)//basically respond command is evaluating as well as responding
-	if err!=nil{
-		respondError(err,c)
+	err := core.EvalAndRespond(cmds, c)//basically respond command is evaluating as well as responding
+	if err != nil{
+		respondError(err, c)
+		return err
 	}
 	/*
 	Basically we are building an echo server like whatever we are getting from client, we are sending it back to him
 	*/
+	return nil
 }
 
 func RunSyncTCPServer(config *Config){
 
 	log.Println("startign a synchronous TCP Server on", config.Host, config.Port)
-	var con_client int=0
+	var con_client int = 0
 	//this will hold the number of concurrent client that are connceted at the moment
 	/*
 	It is just some extra things like we want to know that yes we have this much m=concurrent server
@@ -110,8 +112,8 @@ func RunSyncTCPServer(config *Config){
 	Our server will start listening to the port that means any of the client can talk to server from the port upon which it is listening to
 	once  our server is started then i will run an infinite loop like you can see below
 	*/
-	lsnr,err:=net.Listen("tcp", config.Host+":"+strconv.Itoa(config.Port))
-	if err!=nil{
+	lsnr, err := net.Listen("tcp", config.Host+":"+strconv.Itoa(config.Port))
+	if err != nil{
 		panic(err)
 	}
 	for{
@@ -120,20 +122,20 @@ func RunSyncTCPServer(config *Config){
 		for us to tell that  hey i am waiting for a new conncetion to be connected so we are doing  this blocking call
 		as soon as the client is connected we will move forward ele wr will thrown an error
 		*/
-		c,err:=lsnr.Accept()
-		if err!=nil{
+		c, err := lsnr.Accept()
+		if err != nil{
 			panic(err)
 		}
 		//incrementing the number of concurrent clients
-		con_client+=1
-		log.Println("Client connected with address: ",c.RemoteAddr(),"concurrent clients",con_client)
+		con_client += 1
+		log.Println("Client connected with address: ", c.RemoteAddr(), "concurrent clients", con_client)
 		/*
 		Another infinite loop for
 		we want our clients to continuously sends us command like put this key,get this key etc
 		*/
 		for{
 			//over the docket, continuously read the command and print it out
-			cmd,err:=readCommand(c)
+			cmds, err := readCommand(c)
 			/*
 			as the read command is done, this connect the connection else if the error is propogated back (like client is dissconneted), then err!=null
 			then at time i will close my socket connection, like i want to reduce the number of concurrent client whihc i am handling
@@ -142,20 +144,41 @@ func RunSyncTCPServer(config *Config){
 
 			and if my error is not nil then i wills imply tekk ok ye hai
 			*/
-			if err!=nil{
+			if err != nil{
 				c.Close()
-				con_client-=1
-				log.Println("client disconnected",c.RemoteAddr(),"concurrent clients",con_client)
-				if err==io.EOF{
+				con_client -= 1
+				log.Println("client disconnected", c.RemoteAddr(), "concurrent clients", con_client)
+				if err == io.EOF{
 					break
 				}
-				log.Println("error reading command",err)
+					log.Println("error reading command", err)
 				continue
 			}
-			log.Println("command",cmd)
-			if err:=respond(cmd,c); err!=nil{
-				log.Println("error responding",err)
+			log.Println("command", cmds)
+			if err := respond(cmds, c); err != nil{
+				log.Println("error responding", err)
 			}
 		}
 	}
 }
+/*
+Since when you run it, you'll see that we can;t add more than 1 like even if we add then it will simply won't acknowledge us
+Now why does it happen
+because our server is single threaded, we have for loop inside for loop. so until our client disconnects 
+then your 2nd client will get the chance 
+
+
+So what actually happen when we do connect a redis client to the server
+redis server bhi to bhai TCP hi hoga so, so as sson as redis client is connected some message will exchange
+like jba connect hi krenge by 
+./src/redis-cli -p 7379
+thnn ye backend me mtlb dusre terminal pe jaise hi connect hoga to 
+command *1 
+$7
+COMMAND
+
+Now you might aks that what it actually is: so this is what redis serialization protocol is all about
+this is the command redis-cli sends to server when connection got established
+
+
+*/

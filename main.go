@@ -1,4 +1,5 @@
-package main
+// basically we are writing everything from scratch
+package main 
 
 import(
 "flag"
@@ -24,7 +25,11 @@ func setupFlag(){
 func main(){
 	setupFlag() //we will setup the flags firt
 	log.Println("hello!! is it really running")
-	server.RunAsyncTCPServer(config)
+	err:=server.RunAsyncTCPServer(config)
+	if err!=nil{
+		log.Println("Error starting server:", err)
+		return
+	}
 	/*
 	I will be running Synchronous TCP Server means i iwll be starting the TCP connection on give port synchronously
 	*/
