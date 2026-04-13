@@ -8,14 +8,20 @@ import (
 )
 
 var RESP_NIL []byte=[]byte("$-1\r\n")
+var RESP_OK []byte=[]byte("+OK\r\n")
+var RESP_ZERO []byte=[]byte(":0\r\n")
+var RESP_ONE []byte=[]byte(":1\r\n")
+var RESP_MINUS_1 []byte=[]byte(":-1\r\n")
+var RESP_MINUS_2 []byte=[]byte(":-2\r\n")
 
 // func evalPING(args []string,c net.Conn)error{
-func evalPING(args []string,c io.ReadWriter) error{
+func evalPING(args []string) []byte{
+	//eariler we used to return an error , but now we return a slice of bytes(which is the actual response)
 	var b []byte 
 
 	if len(args)>=2{
 		//means if the redis cli passes us more than 1 arguments then this will invoke 
-		return errors.New("ERR wrong number of arguments for 'ping' command")
+		return Encode(errors.New("ERR wrong number of arguments for 'ping' command"))
 	}
 
 	if len(args)==0{
@@ -27,20 +33,21 @@ func evalPING(args []string,c io.ReadWriter) error{
 		b=Encode(args[0],false)
 	}
 
-	_,err:=c.Write(b)
-	return err 
+	// _,err:=c.Write(b)
+	return b
 }
 
-func evalSET(args []string, io.ReadWriter) error{
+func evalSET(args []string) []byte{
+	//similarly for evalSET
 	if len(args)<=1{
 		//iska mtlb we are not passing required arguemnts
-		return errors.New("(error) ERR wrong number of arguments for 'set' commands")
+		return Encode(errors.New("(error) ERR wrong number of arguments for 'set' commands"),false)
 	}
 
 	var key,value string
 	var exDurationMs int64=-1//as we know ki default value of expiration is -1
 
-key,value=args[0],args[1]
+    key,value=args[0],args[1]
 
 	for i:=2;i<len(args);i++{
 		//as we are only implementing expiration as of now par SET functions implements a lot of other options too
@@ -52,29 +59,33 @@ key,value=args[0],args[1]
 			i++;
 			if i==len(args){
 				//mtlb suser kuch pass nhi kiya 
-				return errors.New("(error) ERR syntax error")
+				return Encode(errors.New("(error) ERR syntax error"),false)
 			}
 
 			exDurationSec,err:=strconv.ParseInt(args[3],10,64)
 			if err!=nil{
-				return errors.New("(error) ERR valye is not an integerr or out of range ")
+				return Encode(errors.New("(error) ERR valye is not an integerr or out of range "),false)
 			}
 			exDurationMs=exDurationSec*1000//because we are operation ms granuality
 		default:
-			return errors.New("(error) ERR syntax error")
+			return Encode(errors.New("(error) ERR syntax error"),false)
 		}
 	}
 
 	//after this we have key,value set and it is ptional for expiration
 	//so we will create a new Object
 	Put(key,NewObj(value,exDurationMs))
-	c.Write([]byte("+OK\r\n"))
-	return nil
+	// c.Write([]byte("+OK\r\n"))
+	// return nil
+	return RESP_OK
+	/*
+	So instead of socket io we are just returning slice of byte, over the sokcet by eval and response 
+	*/
 }
 
-func evalGET(args []string,c io.ReadWriter) error{
+func evalGET(args []string)[]byte{
 	if len(args)!=1{
-		return errors.New("(error) ERR wrong number of argments is passed bro")
+		return Encode(errors.New("(error) ERR wrong number of argments is passed bro"),false)
 	}
 
 	var key string=args[0]
@@ -84,28 +95,31 @@ func evalGET(args []string,c io.ReadWriter) error{
 
 	//if key does not exist, return resp encoded nil
 	if obj==nil{
-		c.Write(RESP_NIL)
-		return nil
+		// c.Write(RESP_NIL)
+		// return nil
+		return RESP_NIL
 	}
 
 	//if key already expired then return nil
 	if obj.ExpiresAt!=-1 && obj.ExpiresAt<=time.Now().UnixMilli(){
-		c.Write(RESP_NIL)
-		return nil
+		// c.Write(RESP_NIL)
+		// return nil
+		return RESP_NIL
 	}
 
 
 	//return te RESP encoded value 
-	c.Write(Encode(obj.Value,false))
-	return nil
+	// c.Write(Encode(obj.Value,false))
+	// return nil
+	return Encode(obj.Value,false)
 }
 //a nil is nothing but a string with -1 length
 //so instead of writing again and again we just created constant object as RESP_NIL and referncing it everywhere
 
 
-func evalTTL(args []string,c io.ReadWriter) error{
+func evalTTL(args []string) []byte{
 	if len(args)!=1{
-		return errors.New("(error) ERR wrong number of argumenst for 'get' command")
+		return Encode(errors.New("(error) ERR wrong number of argumenst for 'get' command"),false)
 	}
 
 	var key string=args[0]
@@ -114,14 +128,16 @@ func evalTTL(args []string,c io.ReadWriter) error{
 
 	//if the key does not exist, return RESP encoded -2 denoting key does not exist
 	if obj==nil{
-		c.Write([] byte(":-2\r\n"))
-		return nil
+		// c.Write([] byte(":-2\r\n"))
+		// return nil
+		return RESP_MINUS_2
 	}
 
 	//if object exist, but no expiration is set on it then send -1
 	if obj.ExpiresAt==-1{
-		c.Write([]byte(":-1\r\n"))
-		return nil
+		// c.Write([]byte(":-1\r\n"))
+		// return nil
+		return RESP_MINUS_1
 	}
 
 	//compute the time remaining for the key to expire and 
@@ -130,67 +146,92 @@ func evalTTL(args []string,c io.ReadWriter) error{
 
 	//if key expired i.e key does not exist hence return -2
 	if durationMS<0{
-		c.Write([]byte(":-2\r\n"))
-		return nil
+		// c.Write([]byte(":-2\r\n"))
+		// return nil
+		return RESP_MINUS_2
 	}
 
-	c.Write(Encode(int64(durationMS/1000),false))
-	return nil
-
+	// c.Write(Encode(int64(durationMS/1000),false))
+	// return nil
+	return Encode(int64(durationMS/1000),false)
 }
 
-func evalDEL(args []string,c io.ReadWriter)error{
+func evalDEL(args []string) []byte{
 	var countDeleted int=0
 	for _,key :=range args{
 		of ok:=Del(key);ok{
 			countDeleted++
 		}
 	}
-	c.Write(Encode(countDeleted,false))
-	return nil
+	return Encode(countDeleted,false)
+	// return nil
 }
 
-func evalEXPIRE(args []string,c io.ReadWriter) error{
+func evalEXPIRE(args []string)[]byte{
 	if len(args)<=1{
-		return errors.New("(error) ERR wrong number of arguments for 'expire' command")
+		return Encode(errors.New("(error) ERR wrong number of arguments for 'expire' command"),false)
 	}
 
 	var key string=args[0]
 	exDurationSecerr:=strconv.ParseInt(args[1],10,64)
 	if err!=nil{
-		return errors.New("(error) ERR value is nt an integer or out of range")
+		return Encode(errors.New("(error) ERR value is nt an integer or out of range"),false)
 	}
 
 	obj:=Get(key)
 
 	//0 if the timeout was not set: e.g Key doesn't exits, or operation skipped due to provided argument
 	if obj==nil{
-		c.Write([]byte(":0\r\n")) //qki operation successful nhi hua
-		return nil
+		// c.Write([]byte(":0\r\n")) //qki operation successful nhi hua
+		// return nil
+		return RESP_ZERO
 	}
 
 	obj.ExpiresAt=time.Now().UnixMilli()+exDurationSec*1000
 
 	//1 print krenge if the timeout was set
-	c.Write([]byte(":1\r\n"))
-	return nil
+	// c.Write([]byte(":1\r\n"))
+	// return nil
+	return RESP_ONE
+}
+
+//TODO: Make it async by forking a new process
+func evalBGREWRITEAOF(args []string) []nyte{
+	DumpAllAOF()
+	return RESP_OK
 }
 
 // func EvalAndRespond(cmd *Rediscmd,c net.Conn)error{
-func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter) error{
+func EvalAndRespond(cmds *RedisCmds, c io.ReadWriter){
 	//It's job is like depending on what job is sent to us
 	//we trigger the corresponding eval function
 
-	switch cmd.Cmd{
+	var response []bytes
+	buf:=bytes.NewBuffer(response) // this is where we are buffering all 
+	//our logic didn't chnaged, but the way we are consuming has changed
+	for _,cmd:=range cmds{
+		switch cmd.Cmd{
 	case "PING":
-		return evalPING(cmd.Args,c)
+		buf.Write(evalPING(cmd.Args))
 	case "SET":
-		return evalSET(cmd.Args,c)
+		buf.Write(evalSET(cmd.Args))
 	case "GET":
-		return evalGET(cmd.Args,c)
+		buf.Write(evalGET(cmd.Args))
 	case "TTL":
-		return evalTTL(cmd.Args,c)
+		buf.Write(evalTTL(cmd.Args))
+	case "DEL":
+		buf.Write(evalDEL(cmd.Args))
+	case "EXPIRE":
+		buf.Write(evalEXPIRE(cmd.Args))
+	case: "BGREWRITEAOF":
+		buf.Write(evalBGREWRITEAOF(cmd.Args))
 	default:
-		return evalPING(cmd.Args,c);
+		buf.Write(evalPING(cmd.Args))
 	}
+	/*
+	Earlier we used to return and like we used to pass io.ReadWriter but now instead of that the eval function that we ahev si returning the output
+	but here we are putting it in buffer
+	*/
+	}
+	c.Write(buf.Bytes())
 }

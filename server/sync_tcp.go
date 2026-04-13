@@ -33,22 +33,46 @@ func readCommand(c net.Conn) (*core.Rediscmd, error) {
 	if err!=nil{
 		return nil,err
 	}
-	// val,err:=core.Decode(buf[:n])
+	/*
+	Pipelining-> me ka
+	     like earlier we used to decode once, but ab we are continuously decoding it
+		 the idea here is we would want to accept multiple commands 
+		 so we want commands back to back literally concatenated
+
+	*/
+	values,err:=core.Decode(buf[:n])
+	if err!=nil{
+		return nil,err
+	}
 	/*
 	and decoding it into an array of strings
 	when any redis cleint wants to issue a command to redis server then a command typically has 
 	root command and argument,all of them is sent to as an array of strings so if  am doing PUT key,value-> then it will sends as array of strings 
 	*/
-	tokens,err:=core.DecodeArrayString(buf[:n])
-	if err!=nil{
-		return nil,err
+	// tokens,err:=core.DecodeArrayString(buf[:n])
+	// if err!=nil{
+	// 	return nil,err
+	// }
+	// // return val.(*core.Command), nil
+	// //once we had tokens we are creating redis command object and passing the root command in which tokens[0] will become command and rest will become the argument 
+	// return &core.Rediscmd{
+	// 	Cmd:strings.ToUpper(tokens[0]),
+	// 	Args: tokens[1:],
+	// },nil
+
+	var cmds []*core.RedisCmd=make([]*core.RedisCmd,0)
+	for _,value:=range values{
+		tokens,err:=toArrayString(value.([]interface{}))
+		if err!=nil{
+			return nil,err
+		}
+		//so here are we 
+		cmds=append(cmds,&core.RedisCmd{
+			Cmd:strings.ToUpper(tokens[0])
+			Args:tokens[1:],
+		})
 	}
-	// return val.(*core.Command), nil
-	//once we had tokens we are creating redis command object and passing the root command in which tokens[0] will become command and rest will become the argument 
-	return &core.Rediscmd{
-		Cmd:strings.ToUpper(tokens[0]),
-		Args: tokens[1:],
-	},nil
+	return cmds,nil
 }
 
 func respondError(err error,c net.Conn){
@@ -60,10 +84,10 @@ func respondError(err error,c net.Conn){
 	c.Write([]byte(fmt.Sprintf("-%s\r\n",err)))
 }
 
-func respond(cmd *core.Rediscmd,c net.Conn){//Responding with connection
+func respond(cmd *core.Rediscmds,c io.ReadWriter){//Responding with connection
 	//we passed give the command and given the socket connection, just writing it back over the socket
 	//like whatever we got we are sending it back to the client
-	err:=core.EvalAndRespond(cmd,c)//basically respond command is evaluating as well as responding
+	err:=core.EvalAndRespond(cmds,c)//basically respond command is evaluating as well as responding
 	if err!=nil{
 		respondError(err,c)
 	}

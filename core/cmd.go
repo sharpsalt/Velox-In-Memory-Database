@@ -7,3 +7,5 @@ type Rediscmd struct{
 /*
 Basically we are giving it a proper structure like, when we are doing PINg, it will does that with a structure
 */
+type RedisCmds []*RedisCmd //Rediscommands will be basically an array of redis command
+

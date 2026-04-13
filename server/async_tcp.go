@@ -156,13 +156,13 @@ func RunAsyncTCPServer() error{
 			}else{
 				//if it is not my server which means that some client that is already connected to the server, then do somthing
 				conn:=core.FDComm{FD:int(events[i].Fd)}
-				cmd,err:=readCommand(comm)
+				cmds,err:=readCommands(comm) //instead of passing 1 command, we will pass many commands
 				if err!=nil{
 					syscall.Close(int(events[i].Fd))
 					con_client-=1
 					continue
 				}
-				respond(cmd,conn)
+				respond(cmds,conn)
 			}
 		}
 	}
