@@ -33,5 +33,32 @@ func Put(k string,obj *Obj){
 }
 
 func Get(k string) *Obj{
-    return store[k]
+    v:=store[k]
+	/*we check for the expiration and if it is already not deleted then we have to delete it 
+	*/
+	if v!=nil{
+		if v.ExpiresAt<=time.Now().UnixMilli(){
+			//this is like a lazy deletion
+			/*
+			If a key is accessed and fund to be expired , then it deleted else it is not deleted
+			periodicaly it is mvoing forward and sample randomly 20 keys and seees the expiration and delete the required one
+			and phir se whi loop chalao 
+			*/
+			delete(store,k)
+			return nil
+		}
+	}
+	return v
 }
+
+func Del(k string ) bool{
+	if _,ok:=store[k];ok{
+		delete(store,k)
+		return true
+	}
+	return false
+}
+/*
+What happens when there is no memory to allocate, so what will you do
+basically we will do cache eviction inorder to make our db not crash at any point 
+*/

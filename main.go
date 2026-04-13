@@ -1,11 +1,10 @@
-// basically we are writing everything from scratch
 package main
 
 import(
-	"flag"
-	"log"
+"flag"
+"log"
 
-	"github.com/sharpsalt/Velox-In-Memory-Database/server"
+"github.com/sharpsalt/Velox-In-Memory-Database/server"
 )
 
 var config=&server.Config{}
@@ -30,4 +29,3 @@ func main(){
 	I will be running Synchronous TCP Server means i iwll be starting the TCP connection on give port synchronously
 	*/
 }
-

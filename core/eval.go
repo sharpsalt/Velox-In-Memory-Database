@@ -139,7 +139,42 @@ func evalTTL(args []string,c io.ReadWriter) error{
 
 }
 
+func evalDEL(args []string,c io.ReadWriter)error{
+	var countDeleted int=0
+	for _,key :=range args{
+		of ok:=Del(key);ok{
+			countDeleted++
+		}
+	}
+	c.Write(Encode(countDeleted,false))
+	return nil
+}
 
+func evalEXPIRE(args []string,c io.ReadWriter) error{
+	if len(args)<=1{
+		return errors.New("(error) ERR wrong number of arguments for 'expire' command")
+	}
+
+	var key string=args[0]
+	exDurationSecerr:=strconv.ParseInt(args[1],10,64)
+	if err!=nil{
+		return errors.New("(error) ERR value is nt an integer or out of range")
+	}
+
+	obj:=Get(key)
+
+	//0 if the timeout was not set: e.g Key doesn't exits, or operation skipped due to provided argument
+	if obj==nil{
+		c.Write([]byte(":0\r\n")) //qki operation successful nhi hua
+		return nil
+	}
+
+	obj.ExpiresAt=time.Now().UnixMilli()+exDurationSec*1000
+
+	//1 print krenge if the timeout was set
+	c.Write([]byte(":1\r\n"))
+	return nil
+}
 
 // func EvalAndRespond(cmd *Rediscmd,c net.Conn)error{
 func EvalAndRespond(cmd *RedisCmd, c io.ReadWriter) error{

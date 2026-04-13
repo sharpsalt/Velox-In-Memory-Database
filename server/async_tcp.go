@@ -10,6 +10,9 @@ import(
 )
 
 con_client:=0
+var cronFrequency time.Duration=1*time.Second //a cron frequency of 1s
+var lastCronExecTime time.Time=time.Now() //and we are maintaining, last time it ran
+
 
 func RunAsyncTCPServer() error{
 	log.Println("Starting an asynchronous TCP Server on", config.Host,config.Port)
@@ -96,6 +99,26 @@ func RunAsyncTCPServer() error{
 	}
 
 	for{
+		/*
+		The first thing which we do to execute this cron
+
+		now that my time, means when the loops execute and control flow comes over here and if enough time has passed then other
+
+		we are just plugging our logic as first
+		everytime the control flow comes here then each time ye run krega
+
+
+		Redis uses interrupst, kernel level interrupts and then it would run it 
+
+		sine we are just understanding how single threaded high performance data can be build
+		*/
+		if time.Now().After(lastCronExecTime.Add(cronFrequency)){
+			core.DeleteExpiredKey()
+			lastCronExecution=time.Now()
+		}
+
+
+
 		//basically we have to constantly monitor if an IO is ready
 		//that why i am invoking EPOLL wait
 
@@ -149,4 +172,8 @@ func RunAsyncTCPServer() error{
 In synchronous we will get abstracted socket connection
 while uspe hum asynchronous me fd use krte hai 
 
+
+
+The only place wehre i can put my autodelete is inside evntloop mtlb yaha pe, as in Redis the deletion happens in two phases->active and passive
+so the event loop that we wrote,basically the infinite for loop that is waiting on epoll wait,just before we added
 */
