@@ -117,7 +117,7 @@ func DecodeOne(data []byte)(interface{},int,error){
 	return nil,0,nil
 }
 
-func Decode(data []byte)(interface{},error){
+func Decode(data []byte)([]interface{},error){
 	/*
 	Decode function will take a slice of byte called as Data
 	and it returns the actuals object, and also return an optional error
@@ -125,35 +125,50 @@ func Decode(data []byte)(interface{},error){
 	So we may get extremely large slice of byte but the decodeOne willl decode the first RESP value of it 
 	DecodeOne will decode each of it and return value,int,and optional error.
 	*/
-	if len(data) == 0 {
-		return nil, errors.New("no data")
+	if len(data)==0{
+		return nil,errors.New("no data")
 	}
 
-	value, _, err := DecodeOne(data)
-	if err != nil {
-		return nil, err
-	}
+	// value, _, err := DecodeOne(data)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	// Only try to convert to command if the value is an array
-	if array, ok := value.([]interface{}); ok {
-		if len(array) == 0 {
-			return &Command{}, nil
-		}
+	// if array, ok := value.([]interface{}); ok {
+	// 	if len(array) == 0 {
+	// 		return &Command{}, nil
+	// 	}
 
-		if name, ok := array[0].(string); ok {
-			command := &Command{
-				Name: name,
-			}
-			for _, v := range array[1:] {
-				if arg, ok := v.(string); ok {
-					command.Args = append(command.Args, arg)
-				}
-			}
-			return command, nil
+	// 	if name, ok := array[0].(string); ok {
+	// 		command := &Command{
+	// 			Name: name,
+	// 		}
+	// 		for _, v := range array[1:] {
+	// 			if arg, ok := v.(string); ok {
+	// 				command.Args = append(command.Args, arg)
+	// 			}
+	// 		}
+	// 		return command, nil
+	// 	}
+	// }
+
+	//instead of returning one object,it will return an array of objects 
+	var values []interface{}=make([]interface{},0)
+	//firts we will take values like decode can iterate through multiple concatenated values
+	var index int=0
+	for index<len(data){
+		//let's say we are passing 3 values back to back concatenated 
+		//hence first me value phir delta, phir err lega 
+		value,delta,err:=DecodeOne(data[index:])
+		if err!=nil{
+			return values,err
 		}
+		index=index+delta
+		values=append(values,value)
 	}
 
-	return value, nil
+	return value,nil
 }
 
 func DecodeArrayString(data []byte)([]string,error){
