@@ -29,6 +29,17 @@ func NewObj(value interface{},DurationMs int64) *Obj{
 }
 
 func Put(k string,obj *Obj){
+	// store[k]=obj
+	/*
+	When we would be triggering eviction? when we hit the memory
+	->means max memory, for us to know how much is required so
+	we will do like atmax my cache will hold this much of it...
+
+	while puttng it , we first check if the length is more than what is required then evict kro 
+	*/
+	if len(store)>=config.KeysLimit{
+		evict()
+	}
 	store[k]=obj
 }
 
