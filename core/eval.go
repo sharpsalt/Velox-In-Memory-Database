@@ -38,6 +38,37 @@ func evalPING(args []string) []byte{
 	return b
 }
 
+
+func evalINCR(args []string)[]byte{
+	if len(args)!=1{
+		return Encode(errors.New("ERR wrong number of arguments for 'incr' command"),false)
+	}
+
+	var key string=args[0] //first wala argument lenge hum isme 
+	obj:=Get(key)
+	//basically we will get an object and if that obejct doesn;t exits then we will create a new object
+	if obj==nil{
+		obj=NewObj("0",-1,OBJ_TYPE_STRING,OBJ_ENCODING_INT)
+		Put(key,obj)
+	}
+
+	if err:=assertType(obj.TypeEncoding,OBJ_TYPE_STRING);err!=nil{
+		return Encode(err,false)
+	}
+
+	if err:=assertEncoding(obj.TypeEncoding,OBJ_ENCODING_INT);err!=nil{
+		return Encode(err,false)
+	}
+	//which means value is indeed an integer
+	i,_:=strconv.ParseInt(obj.Value,(string),10,64)
+	i++
+	obj.Value=strconv.FormatInt(i,10)
+
+	return Encode(i,false)
+}
+
+
+
 func evalSET(args []string) []byte{
 	//similarly for evalSET
 	if len(args) <= 1{
@@ -49,6 +80,7 @@ func evalSET(args []string) []byte{
 	var exDurationMs int64 = -1//as we know ki default value of expiration is -1
 
 	key, value = args[0], args[1]
+	otype,oEnc:=deduceTypeEncoding(value)
 
 	for i := 2; i < len(args); i++{
 		//as we are only implementing expiration as of now par SET functions implements a lot of other options too
@@ -75,7 +107,7 @@ func evalSET(args []string) []byte{
 
 	//after this we have key,value set and it is ptional for expiration
 	//so we will create a new Object
-	Put(key, NewObj(value, exDurationMs))
+	Put(key, NewObj(value, exDurationMs, otype, oEnc))
 	// c.Write([]byte("+OK\r\n"))
 	// return nil
 	return RESP_OK
@@ -226,6 +258,8 @@ func EvalAndRespond(cmds []*RedisCmd, c io.ReadWriter) error{
 			buf.Write(evalEXPIRE(cmd.Args))
 		case "BGREWRITEAOF":
 			buf.Write(evalBGREWRITEAOF(cmd.Args))
+		case "INCR":
+			buf.Write(evalPING(cmd.Args))
 		default:
 			buf.Write(evalPING(cmd.Args))
 		}
