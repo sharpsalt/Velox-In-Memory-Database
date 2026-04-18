@@ -18,7 +18,9 @@ func init(){
 	store=make(map[string]*Obj)
 }
 
-func NewObj(value interface{},DurationMs int64) *Obj{
+//eralier we used to take (value interface{},DurationMs int64)
+//but now we are also stroing type encoding so, 1 for object type and 1 for encdojgn
+func NewObj(value interface{},DurationMs int64,oType uint8,oEnc uint8) *Obj{
 	//creating a new object, setting things up and returning another object
 	//since we want to store abolution expires instead of doing it multiple time that's why we have created this fucntion
 	var expiresAt int64=-1
@@ -28,6 +30,7 @@ func NewObj(value interface{},DurationMs int64) *Obj{
 
 	return &Obj{
 		Value: value,
+		TypeEncoding: oType|oEnc,
 		ExpiresAt: expiresAt,
 	}
 }
