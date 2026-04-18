@@ -30,7 +30,7 @@ func NewObj(value interface{},DurationMs int64,oType uint8,oEnc uint8) *Obj{
 
 	return &Obj{
 		Value: value,
-		TypeEncoding: oType|enc,
+		TypeEncoding: oType|oEnc,
 		ExpiresAt: expiresAt,
 	}
 }
