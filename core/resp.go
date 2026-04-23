@@ -224,6 +224,8 @@ func Encode(value interface{}, isSimple bool) []byte{
 		return []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(v), v))
 	case int, int8, int16, int32, int64:
 		return []byte(fmt.Sprintf(":%d\r\n", v))
+	case uint, uint8, uint16, uint32, uint64:
+        return []byte(fmt.Sprintf(":%d\r\n", v)) // Support unsigned ints for DEL and similar commands
 	case []string:
 		var b []byte
 		buf := bytes.NewBuffer(b)
