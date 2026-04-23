@@ -2,36 +2,46 @@ package core
 
 import (
 	"time"
-	
+	"store.go"
 	"github.com/sharpsalt/Velox-In-Memory-Database/config"
 )
 
 var store map[string]*Obj
 //the best datastrcuture to hold key value is hash table so we are using it
 
-type Obj struct{
-	Value interface{} //which means we acn put literally anything,anyvalue and which would work fine
-	ExpiresAt int64 //is time ke baad expire hojayega wo
-}
+var expires map[*Obj]uint64; //similar to redis like redis has key value dictionary, adn it has expires
+//so we are storing object pointer walong with expiration time 
+
 
 func init(){
 	store=make(map[string]*Obj)
+	expires=make(map[*Obj]uint64)
+}
+
+func setExpiry(obj *Obj,expDurationMs int64){
+	expires[obj]=uint64(time.Now().UnixMilli())+uint64(expDurationMs)
 }
 
 //eralier we used to take (value interface{},DurationMs int64)
 //but now we are also stroing type encoding so, 1 for object type and 1 for encdojgn
-func NewObj(value interface{},DurationMs int64,oType uint8,oEnc uint8) *Obj{
+func NewObj(value interface{},expDurationMs int64,oType uint8,oEnc uint8) *Obj{
 	//creating a new object, setting things up and returning another object
 	//since we want to store abolution expires instead of doing it multiple time that's why we have created this fucntion
 	var expiresAt int64=-1
-	if DurationMs>0{
-		expiresAt=time.Now().UnixMilli()+DurationMs
+	if expDurationMs>0{
+		/*
+		when we say setExpiry?
+
+		it means we have to create an enrty of particular object that is expired dictionary
+		*/
+		setExpiry(obj,expDurationMs)
 	}
 
 	return &Obj{
 		Value: value,
 		TypeEncoding: oType|oEnc,
-		ExpiresAt: expiresAt,
+		// ExpiresAt: expiresAt,
+		LastAccessedAt: getCurrentClock(),
 	}
 }
 
@@ -47,7 +57,13 @@ func Put(k string, obj *Obj){
 	if len(store) >= config.KeysLimit{
 		evict()
 	}
+	obj.LastAccessedAt=getCurrentClock()
 	store[k] = obj
+	if KeyspaceStat[0]==nil{
+		KeyspaceStat[0]=make(map[string]int)
+	}
+	KeyspaceStat[0]["keys"]++
+	//actually you can use grafana to visualize it, like it's easy , you just have to knwo how things work
 }
 
 func Get(k string) *Obj{
@@ -62,16 +78,21 @@ func Get(k string) *Obj{
 			periodicaly it is mvoing forward and sample randomly 20 keys and seees the expiration and delete the required one
 			and phir se whi loop chalao 
 			*/
-			delete(store,k)
-			return nil
+			if hasExpired(v){
+				Del(k)
+			    return nil
+			}
 		}
 	}
+	v.LastAccessedAt=getCurrentClock()
 	return v
 }
 
 func Del(k string ) bool{
 	if _,ok:=store[k];ok{
 		delete(store,k)
+		delete(expire,_)
+		KeyspaceStat[0]["keys"]--
 		return true
 	}
 	return false
