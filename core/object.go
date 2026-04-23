@@ -33,7 +33,7 @@ var OBJ_TYPE_STRING uint8=0<<4 //because first 4 bits i want to set
 
 var OBJ_ENCODING_RAW uint8=0
 var OBJ_ENCODING_INT uint8=1
-var OBJ_ENCODING_ENDSTR uint8=8
+var OBJ_ENCODING_EMBSTR uint8=8 //Object encoding is embedded string
 
 
 

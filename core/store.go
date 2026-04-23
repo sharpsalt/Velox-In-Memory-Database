@@ -2,9 +2,10 @@ package core
 
 import (
 	"time"
-	"store.go"
+	
 	"github.com/sharpsalt/Velox-In-Memory-Database/config"
 )
+// "store.go" import removed - not a valid package
 
 var store map[string]*Obj
 //the best datastrcuture to hold key value is hash table so we are using it
@@ -27,7 +28,7 @@ func setExpiry(obj *Obj,expDurationMs int64){
 func NewObj(value interface{},expDurationMs int64,oType uint8,oEnc uint8) *Obj{
 	//creating a new object, setting things up and returning another object
 	//since we want to store abolution expires instead of doing it multiple time that's why we have created this fucntion
-	var expiresAt int64=-1
+	// var expiresAt int64=-1
 	if expDurationMs>0{
 		/*
 		when we say setExpiry?
@@ -71,7 +72,7 @@ func Get(k string) *Obj{
 	/*we check for the expiration and if it is already not deleted then we have to delete it 
 	*/
 	if v != nil{
-		if v.ExpiresAt <= time.Now().UnixMilli(){
+		// if v.ExpiresAt <= time.Now().UnixMilli(){
 			//this is like a lazy deletion
 			/*
 			If a key is accessed and fund to be expired , then it deleted else it is not deleted
@@ -82,9 +83,11 @@ func Get(k string) *Obj{
 				Del(k)
 			    return nil
 			}
-		}
+		// }
 	}
-	v.LastAccessedAt=getCurrentClock()
+	if v!=nil{
+		v.LastAccessedAt=getCurrentClock()
+	}
 	return v
 }
 

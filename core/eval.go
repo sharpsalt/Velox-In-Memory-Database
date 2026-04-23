@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"strconv"
 	"time"
@@ -60,11 +61,11 @@ func evalINCR(args []string)[]byte{
 		return Encode(err,false)
 	}
 	//which means value is indeed an integer
-	i,_:=strconv.ParseInt(obj.Value,(string),10,64)
+	i, _ := strconv.ParseInt(obj.Value.(string), 10, 64)  // Fixed: proper type assertion
 	i++
-	obj.Value=strconv.FormatInt(i,10)
+	obj.Value = strconv.FormatInt(i, 10)
 
-	return Encode(i,false)
+	return Encode(i, false)
 }
 
 
@@ -134,11 +135,11 @@ func evalGET(args []string)[]byte{
 	}
 
 	//if key already expired then return nil
-	if obj.ExpiresAt!=-1 && obj.ExpiresAt<=time.Now().UnixMilli(){
-		// c.Write(RESP_NIL)
-		// return nil
-		return RESP_NIL
-	}
+	// if obj.ExpiresAt!=-1 && obj.ExpiresAt<=time.Now().UnixMilli(){
+	// 	// c.Write(RESP_NIL)
+	// 	// return nil
+	// 	return RESP_NIL
+	// }
 
 	//if key already expired then return nil
 	if hasExpired(obj){
@@ -170,42 +171,46 @@ func evalTTL(args []string) []byte{
 	}
 
 	//if object exist, but no expiration is set on it then send -1
-	if obj.ExpiresAt==-1{
-		// c.Write([]byte(":-1\r\n"))
-		// return nil
-		return RESP_MINUS_1
-	}
+	// if obj.ExpiresAt==-1{  // Commented out - ExpiresAt field removed
+	// 	// c.Write([]byte(":-1\r\n"))
+	// 	// return nil
+	// 	return RESP_MINUS_1
+	// }
 
 	//compute the time remaining for the key to expire and 
 	//return the RESP encoded form of it 
-	durationMs:=obj.ExpiresAt-time.Now().UnixMilli()
+	// durationMs:=obj.ExpiresAt-time.Now().UnixMilli()  // Commented out
 
 	//if key expired i.e key does not exist hence return -2
-	if durationMs < 0{
-		// c.Write([]byte(":-2\r\n"))
-		// return nil
-		return RESP_MINUS_2
-	}
+	// if durationMs < 0{  // Commented out
+	// 	// c.Write([]byte(":-2\r\n"))
+	// 	// return nil
+	// 	return RESP_MINUS_2
+	// }
 
-	exp.isExpirySet:=getExpiry(obj)
-	if !isExpirySet{
+	exp, isExpirySet := getExpiry(obj)  // Fixed: handle both return values
+	if !isExpirySet{  // Fixed: proper handling
 		return RESP_MINUS_1
 	}
 
 	//if key expired i.e key does not exist hence return -2
-	if uint64(time.Now().UnixMilli())>exp{
+	if uint64(time.Now().UnixMilli())>uint64(exp){
 		return RESP_MINUS_2
 	}
 
 	//compute the time remaining for the key to expire and 
-	//return the RESP encoded form of it 
-	durationMS:=exp-uint64(time.Now().UnixMilli())
-
+	//return the RESP encoded form of it
+	durationMs:=int64(exp)-time.Now().UnixMilli()
+	
+	return Encode(durationMs/1000,false)
+}
+	// Duplicate code commented out below - was causing syntax error
+	// durationMS:=exp-uint64(time.Now().UnixMilli())
 	// c.Write(Encode(int64(durationMS/1000),false))
 	// return nil
-	return Encode(int64(durationMs/1000), false)
-}
+	// return Encode(int64(durationMs/1000), false)
 
+// Continue with next function
 func evalDEL(args []string) []byte{
 	var countDeleted int = 0
 	for _, key := range args{
@@ -255,10 +260,11 @@ func evalBGREWRITEAOF(args []string) []byte{
 
 func evalINFO(args []string)[]byte{
 	var info []byte
-	buf:=bytes.NewBuffer(info)
+	buf := bytes.NewBuffer(info)
 	for i := range KeyspaceStat{
-		buf.WriteString(fmt.Sprintf("db%d:keys=%d,expire=0,avg_ttl=0\r\n",i,KeyspaceStat[i]["keys"]))
+		buf.WriteString(fmt.Sprintf("db%d:keys=%d,expire=0,avg_ttl=0\r\n", i, KeyspaceStat[i]["keys"]))
 	}
+	return buf.Bytes()  // Fixed: added missing return
 }
 
 // func EvalAndRespond(cmd *Rediscmd,c net.Conn)error{
@@ -286,13 +292,13 @@ func EvalAndRespond(cmds []*RedisCmd, c io.ReadWriter) error{
 		case "BGREWRITEAOF":
 			buf.Write(evalBGREWRITEAOF(cmd.Args))
 		case "INCR":
-			buf.Write(evalPING(cmd.Args))
+			buf.Write(evalINCR(cmd.Args))
 		case "INFO":
 			buf.Write(evalINFO(cmd.Args))
-		case "CLIENT":
-			buf.Write(evalCLIENT(cmd.Args))
-		case "LATENCY":
-			buf.Write(evalLATENCY(cmd.Args))
+		// case "CLIENT":  // Commented out - evalCLIENT not implemented
+		// 	buf.Write(evalCLIENT(cmd.Args))
+		// case "LATENCY":  // Commented out - evalLATENCY not implemented
+		// 	buf.Write(evalLATENCY(cmd.Args))
 		default:
 			buf.Write(evalPING(cmd.Args))
 		}

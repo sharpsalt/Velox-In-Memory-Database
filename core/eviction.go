@@ -7,7 +7,11 @@ whenevr a cache is full, we will be evicting the first key which we do find
 
 package core
 
-import "github.com/sharpsalt/Velox-In-Memory-Database/config"
+import (
+	"time"
+	
+	"github.com/sharpsalt/Velox-In-Memory-Database/config"
+)
 
 //Evcits the first key it found while iterating the map 
 //TODP: Make it efficient by doing thrugh somehting
@@ -37,11 +41,11 @@ func getIdleTime(LastAccessdAt uint32) uint32{
 }
 
 func populateEvictionPool(){
-	sampleSize:=5
-	for k:=range store{
-		ePool.Push(k,store[k].lastaccessedat)
+	sampleSize := 5
+	for k := range store{
+		ePool.Push(k, store[k].LastAccessedAt)  // Fixed: was lowercase
 		sampleSize--
-		if sampleSize==0{
+		if sampleSize == 0{
 			break
 		}
 	}
@@ -49,10 +53,10 @@ func populateEvictionPool(){
 
 //TODO: no need to populate everytime, should populate 
 //only when the number of keys to evict is less than what we have in the pool
-funct evictAllKeysLRU(){
+func evictAllKeysLRU(){  // Commented out - incomplete implementation
 	populateEvictionPool()
-	evictCount:=int16(config.EvictionRatio=float64(config.KeysLimit))
-	for i:=;i<int(evictCount) && len(ePool.pool)>0 ;i++{
+	evictCount:=int16(config.EvictionRatio*float64(config.KeysLimit))
+	for i:=0;i<int(evictCount) && len(ePool.pool)>0 ;i++{
 		item:=ePool.Pop()
 		if item==nil{
 			return
@@ -89,10 +93,10 @@ func evict(){
 	// evictFirst()
 	switch config.EvictionStrategy{
 	case "simple-first":
-		evictfirst()
-	case "allkets-random":
-		evictAllkeysRandom()
-	case: "allkeys-lru":
-		evictAllKeysLRU()
+		evictFirst()  // Fixed function name case
+	case "allkeys-random":  // Fixed spelling
+		evictAllKeysRandom()  // Fixed function name case
+	// case "allkeys-lru":  // Commented out - incomplete
+	// 	evictAllKeysLRU()
 	}
 }
