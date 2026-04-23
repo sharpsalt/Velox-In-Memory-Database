@@ -29,21 +29,21 @@ func NewObj(value interface{},expDurationMs int64,oType uint8,oEnc uint8) *Obj{
 	//creating a new object, setting things up and returning another object
 	//since we want to store abolution expires instead of doing it multiple time that's why we have created this fucntion
 	// var expiresAt int64=-1
-	if expDurationMs>0{
-		/*
+
+	/*
 		when we say setExpiry?
 
 		it means we have to create an enrty of particular object that is expired dictionary
 		*/
-		setExpiry(obj,expDurationMs)
-	}
-
-	return &Obj{
-		Value: value,
-		TypeEncoding: oType|oEnc,
-		// ExpiresAt: expiresAt,
-		LastAccessedAt: getCurrentClock(),
-	}
+	obj:=&Obj{
+       Value:value,
+       TypeEncoding:oType|oEnc,
+       LastAccessedAt:getCurrentClock(),
+    }
+    if expDurationMs>0{
+       setExpiry(obj,expDurationMs)
+    }
+    return obj
 }
 
 func Put(k string, obj *Obj){
@@ -92,12 +92,13 @@ func Get(k string) *Obj{
 }
 
 func Del(k string ) bool{
-	if _,ok:=store[k];ok{
-		delete(store,k)
-		delete(expire,_)
-		KeyspaceStat[0]["keys"]--
-		return true
-	}
+	obj,ok:=store[k]
+    if ok {
+        delete(store, k)
+        delete(expires, obj)
+        KeyspaceStat[0]["keys"]--
+        return true
+    }
 	return false
 }
 /*
