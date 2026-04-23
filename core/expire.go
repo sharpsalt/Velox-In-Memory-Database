@@ -30,13 +30,18 @@ func expireSample() float32{
 
 	//assuming iteration of golang hash table in randomized    
 	for key, obj := range store{
-		if obj.ExpiresAt != -1{
+		// if obj.ExpiresAt != -1{
+		// 	limit--
+		// 	//if the key is expired
+		// 	if obj.ExpiresAt <= time.Now().UnixMilli(){
+		// 		delete(store, key)
+		// 		expiresCount++
+		// 	}
+		// }
+		if hasExpired(obj){
+			delete(store,key)
+			expiresCount++
 			limit--
-			//if the key is expired
-			if obj.ExpiresAt <= time.Now().UnixMilli(){
-				delete(store, key)
-				expiresCount++
-			}
 		}
 
 		//one we iterated to 20 keys that have some expirations set
