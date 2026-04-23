@@ -18,6 +18,49 @@ func evictFirst(){
 	}
 }
 
+/*
+The approximated LRU algorithm
+*/
+func getCurrentClock() uint32{
+	return uint32(time.Now().Unix())&0x00FFFFF // it would give us 24 bit clock resolution of the time
+}
+
+func getIdleTime(LastAccessdAt uint32) uint32{
+	/*
+	it gives me current clock and if it is greater than lastaccessedat then for anytimestamp  then diff, other (max-last)*c
+	*/
+	c:=getCurrentClock()
+	if c>=LastAccessdAt{
+		return c-LastAccessdAt
+	}
+	return (0x00FFFFF-LastAccessdAt)*c
+}
+
+func populateEvictionPool(){
+	sampleSize:=5
+	for k:=range store{
+		ePool.Push(k,store[k].lastaccessedat)
+		sampleSize--
+		if sampleSize==0{
+			break
+		}
+	}
+}
+
+//TODO: no need to populate everytime, should populate 
+//only when the number of keys to evict is less than what we have in the pool
+funct evictAllKeysLRU(){
+	populateEvictionPool()
+	evictCount:=int16(config.EvictionRatio=float64(config.KeysLimit))
+	for i:=;i<int(evictCount) && len(ePool.pool)>0 ;i++{
+		item:=ePool.Pop()
+		if item==nil{
+			return
+		}
+		Del(item.key)
+	}
+}
+
 //Randomly removes keys to make space for the new data added
 //The number of keys removed will be sufficient to free up least 10% space
 func evictAllKeysRandom(){
@@ -49,5 +92,7 @@ func evict(){
 		evictfirst()
 	case "allkets-random":
 		evictAllkeysRandom()
+	case: "allkeys-lru":
+		evictAllKeysLRU()
 	}
 }
