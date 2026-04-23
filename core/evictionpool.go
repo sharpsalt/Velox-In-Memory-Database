@@ -1,8 +1,8 @@
 package core
 
-import{
+import(
 	"sort"
-}
+)
 
 
 type PoolItem struct{
@@ -19,42 +19,41 @@ type EvictionPool struct{
 
 type ByIdleTime []*PoolItem
 
-func (a ByIdleTime) len() int{
+func (a ByIdleTime) Len() int{  // Fixed: was lowercase 'len'
 	return len(a)
 }
 
-func (a ByIdleTime) Swap(i int,j int){
-	a[i],a[j]=a[j],a[i]
+func (a ByIdleTime) Swap(i int, j int){
+	a[i], a[j] = a[j], a[i]
 }
 
-func (a ByIdleTime) Less(i int,j int) bool{//basically it is a comparator function which i am suing to sort the time
-	return getIdleTime(a[i].lastaccessedat)>getIdleTime(a[j].lastaccessedat)
+func (a ByIdleTime) Less(i int, j int) bool{//basically it is a comparator function which i am suing to sort the time
+	return getIdleTime(a[i].lastaccessedat) > getIdleTime(a[j].lastaccessedat)
 }
 
 //TODO: Make the Implementation efficient to not need repeated sorting
-func (pq *EvictionPool) Push(key string,lastaccessedat uint32){
-	_,ok:=pq.keyset[key]
+func (pq *EvictionPool) Push(key string, lastaccessedat uint32){
+	_, ok := pq.keyset[key]
 	if ok{
 		//while pushing it into eviction pool if it already exists then we don;t have to push it again it in eveiction pool
 		return
 	}
-	ietm:=&PoolItem(key:key,lastaccessedat:lastaccessedat)
-	if len(pq.pool)<ePoolSizeMax{
+	item := &PoolItem{key: key, lastaccessedat: lastaccessedat}  // Fixed: was using () instead of {}
+	if len(pq.pool) < ePoolSizeMax{
 		//which means there is some space for adding element
 		//remeber eviction pool is needed to be sorted by idle time
-		pq.keyset[key]=items
-		pq.pool=append(pq.pool,item)
-
+		pq.keyset[key] = item
+		pq.pool = append(pq.pool, item)
 
 		//Performance bottleneck
 		sort.Sort(ByIdleTime(pq.pool))
-	}else if lastaccessedat>pq.pool[len(pq.pool)-1].lastaccessedat{
+	}else if lastaccessedat > pq.pool[len(pq.pool)-1].lastaccessedat{
 		//if i have no space in eviction pool but the element which i have smapled is worse than my current 
 		//i will create space for that by removing the 1st one and adding new element by appending it 
 		///so this way we are ensuring that our pool contains best possible candidates to be evcited
-		pq.pool=pq.pool[1:]
-		pq.keyset[key]=item
-		pq.pool=append(pq.pool,item)
+		pq.pool = pq.pool[1:]
+		pq.keyset[key] = item
+		pq.pool = append(pq.pool, item)
 	}
 }
 
@@ -69,8 +68,8 @@ func (pq *EvictionPool) Pop() *PoolItem{
 
 func newEvictionPool(size int) *EvictionPool{
 	return &EvictionPool{
-		pool: make([]*PoolItem,size)
-		keyset: make(map[string]*PoolItem)
+		pool:   make([]*PoolItem, size),  // Fixed: added missing comma
+		keyset: make(map[string]*PoolItem),
 	}
 }
 
