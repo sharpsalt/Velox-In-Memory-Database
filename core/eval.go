@@ -140,7 +140,10 @@ func evalGET(args []string)[]byte{
 		return RESP_NIL
 	}
 
-
+	//if key already expired then return nil
+	if hasExpired(obj){
+		return RESP_NIL
+	}
 	//return te RESP encoded value 
 	// c.Write(Encode(obj.Value,false))
 	// return nil
@@ -184,6 +187,20 @@ func evalTTL(args []string) []byte{
 		return RESP_MINUS_2
 	}
 
+	exp.isExpirySet:=getExpiry(obj)
+	if !isExpirySet{
+		return RESP_MINUS_1
+	}
+
+	//if key expired i.e key does not exist hence return -2
+	if uint64(time.Now().UnixMilli())>exp{
+		return RESP_MINUS_2
+	}
+
+	//compute the time remaining for the key to expire and 
+	//return the RESP encoded form of it 
+	durationMS:=exp-uint64(time.Now().UnixMilli())
+
 	// c.Write(Encode(int64(durationMS/1000),false))
 	// return nil
 	return Encode(int64(durationMs/1000), false)
@@ -220,7 +237,9 @@ func evalEXPIRE(args []string) []byte{
 		return RESP_ZERO
 	}
 
-	obj.ExpiresAt = time.Now().UnixMilli() + exDurationSec*1000
+	// obj.ExpiresAt = time.Now().UnixMilli() + exDurationSec*1000
+
+	setExpiry(obj,exDurationSec*1000)
 
 	//1 print krenge if the timeout was set
 	// c.Write([]byte(":1\r\n"))
@@ -232,6 +251,14 @@ func evalEXPIRE(args []string) []byte{
 func evalBGREWRITEAOF(args []string) []byte{
 	DumpAllAOF()
 	return RESP_OK
+}
+
+func evalINFO(args []string)[]byte{
+	var info []byte
+	buf:=bytes.NewBuffer(info)
+	for i := range KeyspaceStat{
+		buf.WriteString(fmt.Sprintf("db%d:keys=%d,expire=0,avg_ttl=0\r\n",i,KeyspaceStat[i]["keys"]))
+	}
 }
 
 // func EvalAndRespond(cmd *Rediscmd,c net.Conn)error{
@@ -260,6 +287,12 @@ func EvalAndRespond(cmds []*RedisCmd, c io.ReadWriter) error{
 			buf.Write(evalBGREWRITEAOF(cmd.Args))
 		case "INCR":
 			buf.Write(evalPING(cmd.Args))
+		case "INFO":
+			buf.Write(evalINFO(cmd.Args))
+		case "CLIENT":
+			buf.Write(evalCLIENT(cmd.Args))
+		case "LATENCY":
+			buf.Write(evalLATENCY(cmd.Args))
 		default:
 			buf.Write(evalPING(cmd.Args))
 		}

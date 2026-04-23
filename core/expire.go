@@ -5,6 +5,19 @@ import (
 	"time"
 )
 
+func hasExpired(obj *Obj) bool{
+	exp,ok:=expires[obj]
+	if !ok{
+		return false
+	}
+	return exp<=uint64(time.Now().UnixMilli())
+}
+
+func getExpiry(obj *Obj)(uint64,bool){
+	exp,ok:=expires[obj]
+	return exp,ok
+}
+
 //Delete all the expired keys- the active way
 //Sampling approach: https://redis.io/commands/expire/
 
