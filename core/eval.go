@@ -304,6 +304,19 @@ func evalLATENCY(args []string) []byte {
     }
 }
 
+func evalSLEEP(args []string)[]byte{
+	if len(args)!=1{
+		return Encode(errors.New("ERR wrong number of arguments for 'SLEEP' command"),false)
+	}
+
+	DurationSec,err:=strconv.ParseInt(args[0],10,64)
+	if err!=nil{
+		return Encode(errors.New("ERR value is not an integer or out of range"),false)
+	}
+	time.Sleep(time.Duration(durationSec)*time.Second)
+	return RESP_OK
+}
+
 // func EvalAndRespond(cmd *Rediscmd,c net.Conn)error{
 func EvalAndRespond(cmds []*RedisCmd, c io.ReadWriter) error{
 	//It's job is like depending on what job is sent to us
@@ -336,6 +349,10 @@ func EvalAndRespond(cmds []*RedisCmd, c io.ReadWriter) error{
 			buf.Write(evalCLIENT(cmd.Args))
 		case "LATENCY": 
 			buf.Write(evalLATENCY(cmd.Args))
+		case "LRU":
+			buf.Write(evalLRU(cmd.Args))
+		case "SLEEP":
+			buf.Write(evalSLEEP(cmd.Args))
 		default:
 			buf.Write(evalPING(cmd.Args))
 		}
