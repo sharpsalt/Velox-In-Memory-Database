@@ -53,7 +53,7 @@ func populateEvictionPool(){
 
 //TODO: no need to populate everytime, should populate 
 //only when the number of keys to evict is less than what we have in the pool
-func evictAllKeysLRU(){  // Commented out - incomplete implementation
+func evictAllKeysLRU(){ 
 	populateEvictionPool()
 	evictCount:=int16(config.EvictionRatio*float64(config.KeysLimit))
 	for i:=0;i<int(evictCount) && len(ePool.pool)>0 ;i++{
@@ -96,7 +96,7 @@ func evict(){
 		evictFirst()  // Fixed function name case
 	case "allkeys-random":  // Fixed spelling
 		evictAllKeysRandom()  // Fixed function name case
-	// case "allkeys-lru":  // Commented out - incomplete
-	// 	evictAllKeysLRU()
+	case "allkeys-lru":  // Commented out - incomplete
+		evictAllKeysLRU()
 	}
 }

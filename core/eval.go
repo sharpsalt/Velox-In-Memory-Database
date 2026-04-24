@@ -7,7 +7,9 @@ import (
 	"io"
 	"strconv"
 	"time"
+	"strings"
 )
+
 
 var RESP_NIL []byte=[]byte("$-1\r\n")
 var RESP_OK []byte=[]byte("+OK\r\n")
@@ -267,6 +269,41 @@ func evalINFO(args []string)[]byte{
 	return buf.Bytes()  // Fixed: added missing return
 }
 
+func evalCLIENT(args []string) []byte {
+    if len(args) == 0 {
+        return Encode("CLIENT subcommands: LIST, SETNAME, GETNAME", true)
+    }
+    sub := strings.ToUpper(args[0])
+    switch sub {
+    case "LIST":
+        return Encode("id=1 addr=127.0.0.1:12345 fd=5 name=velox-cli age=0 idle=0 flags=N db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=0 obl=0 oll=0 omem=0 events=r cmd=ping", false)
+    case "SETNAME":
+        if len(args) < 2 {
+            return Encode(errors.New("ERR wrong number of arguments for 'CLIENT SETNAME'"), false)
+        }
+        return RESP_OK
+    case "GETNAME":
+        return Encode("velox-client", false)
+    default:
+        return Encode(errors.New("ERR unknown subcommand for CLIENT"), false)
+    }
+}
+
+func evalLATENCY(args []string) []byte {
+    if len(args) == 0 {
+        return Encode("LATENCY subcommands: LATEST, RESET", true)
+    }
+    sub := strings.ToUpper(args[0])
+    switch sub {
+    case "LATEST":
+        return Encode([]string{"[0, 0, 0, 0, 0]"}, false)
+    case "RESET":
+        return RESP_OK
+    default:
+        return Encode(errors.New("ERR unknown subcommand for LATENCY"), false)
+    }
+}
+
 // func EvalAndRespond(cmd *Rediscmd,c net.Conn)error{
 func EvalAndRespond(cmds []*RedisCmd, c io.ReadWriter) error{
 	//It's job is like depending on what job is sent to us
@@ -295,10 +332,10 @@ func EvalAndRespond(cmds []*RedisCmd, c io.ReadWriter) error{
 			buf.Write(evalINCR(cmd.Args))
 		case "INFO":
 			buf.Write(evalINFO(cmd.Args))
-		// case "CLIENT":  // Commented out - evalCLIENT not implemented
-		// 	buf.Write(evalCLIENT(cmd.Args))
-		// case "LATENCY":  // Commented out - evalLATENCY not implemented
-		// 	buf.Write(evalLATENCY(cmd.Args))
+		case "CLIENT":  
+			buf.Write(evalCLIENT(cmd.Args))
+		case "LATENCY": 
+			buf.Write(evalLATENCY(cmd.Args))
 		default:
 			buf.Write(evalPING(cmd.Args))
 		}
