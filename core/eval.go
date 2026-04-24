@@ -17,6 +17,13 @@ var RESP_ZERO []byte=[]byte(":0\r\n")
 var RESP_ONE []byte=[]byte(":1\r\n")
 var RESP_MINUS_1 []byte=[]byte(":-1\r\n")
 var RESP_MINUS_2 []byte=[]byte(":-2\r\n")
+var RESP_QUEUED []byte=[]byte("+QUEUED\r\n")
+
+var txnCommands map[string]bool
+
+func init(){
+	txnCommands=map[string]bool{"EXEC":true,"DISCARD":true}
+}
 
 // func evalPING(args []string,c net.Conn)error{
 func evalPING(args []string) []byte{
@@ -317,8 +324,66 @@ func evalSLEEP(args []string)[]byte{
 	return RESP_OK
 }
 
+func evalMULTI(agrs []string)[]byte{
+	return RESP_OK
+}
+
+
+func executeCommand(cmds *RedisCmd, c *Client) []byte{
+	//It's job is like depending on what job is sent to us
+	//we trigger the corresponding eval function
+		switch cmd.Cmd{
+		case "PING":
+			evalPING(cmd.Args)
+		case "SET":
+			evalSET(cmd.Args)
+		case "GET":
+			evalGET(cmd.Args)
+		case "TTL":
+			evalTTL(cmd.Args)
+		case "DEL":
+			evalDEL(cmd.Args)
+		case "EXPIRE":
+			evalEXPIRE(cmd.Args)
+		case "BGREWRITEAOF":
+			evalBGREWRITEAOF(cmd.Args)
+		case "INCR":
+			evalINCR(cmd.Args)
+		case "INFO":
+			evalINFO(cmd.Args)
+		case "CLIENT":  
+			evalCLIENT(cmd.Args)
+		case "LATENCY": 
+			evalLATENCY(cmd.Args)
+		case "LRU":
+			evalLRU(cmd.Args)
+		case "SLEEP":
+			evalSLEEP(cmd.Args)
+		case "MULTI":
+			c.TxnBegin()
+			return evalMULTI(cmd.Args)
+		case "EXEC":
+			if !c.isTxn{
+				return Encode(errors.New("ERR EXEC without MULTI"),false)
+			}
+			return c.TxnExec()
+		case "DISCARD":
+			if !c.isTxn{
+				return Encode(errors.New("ERR DISCARD without MULTI"),false)
+			}
+			c.TxnDiscard()
+			return RESP_OK
+		default:
+			return evalPING(cmd.Args)
+		}
+}
+
+func executeCommandToBuffer(cmd *RedisCmd,buf *bytes.Buffer,c *Client){
+	buf.Write(executeCommand(cmd,c))
+}
+
 // func EvalAndRespond(cmd *Rediscmd,c net.Conn)error{
-func EvalAndRespond(cmds []*RedisCmd, c io.ReadWriter) error{
+func EvalAndRespond(cmds []*RedisCmd, c Client){
 	//It's job is like depending on what job is sent to us
 	//we trigger the corresponding eval function
 
@@ -326,41 +391,27 @@ func EvalAndRespond(cmds []*RedisCmd, c io.ReadWriter) error{
 	buf := bytes.NewBuffer(response) // this is where we are buffering all 
 	//our logic didn't chnaged, but the way we are consuming has changed
 	for _, cmd := range cmds{
-		switch cmd.Cmd{
-		case "PING":
-			buf.Write(evalPING(cmd.Args))
-		case "SET":
-			buf.Write(evalSET(cmd.Args))
-		case "GET":
-			buf.Write(evalGET(cmd.Args))
-		case "TTL":
-			buf.Write(evalTTL(cmd.Args))
-		case "DEL":
-			buf.Write(evalDEL(cmd.Args))
-		case "EXPIRE":
-			buf.Write(evalEXPIRE(cmd.Args))
-		case "BGREWRITEAOF":
-			buf.Write(evalBGREWRITEAOF(cmd.Args))
-		case "INCR":
-			buf.Write(evalINCR(cmd.Args))
-		case "INFO":
-			buf.Write(evalINFO(cmd.Args))
-		case "CLIENT":  
-			buf.Write(evalCLIENT(cmd.Args))
-		case "LATENCY": 
-			buf.Write(evalLATENCY(cmd.Args))
-		case "LRU":
-			buf.Write(evalLRU(cmd.Args))
-		case "SLEEP":
-			buf.Write(evalSLEEP(cmd.Args))
-		default:
-			buf.Write(evalPING(cmd.Args))
+		//if txn is not in progress , then we ca simply 
+		//execute the command and add the response to the buffer
+		if !c.isTxn{
+			executeCommandToBuffer(cmd,buf,c)
+			continue
 		}
-		/*
-		Earlier we used to return and like we used to pass io.ReadWriter but now instead of that the eval function that we ahev si returning the output
-		but here we are putting it in buffer
-		*/
+
+		//if the txn is in progress, we enqueue the command 
+		//and add the queued response to the buffer
+		if !txnCommands[cmd.Cmd]{
+			//if the command is queuabe the enqueue
+			c.TxnQueue(cmd)
+			buf.Write(RESP_QUEUED)
+		}else{
+			//if txn is active and the command is non-queuable 
+			//ex: EXEC,DISCARD
+			//we execute the command and gather the response in buffer
+			executeCommandToBuffer(cmd,buf,c)
+		}
 	}
-	_, err := c.Write(buf.Bytes())
-	return err
+	// _, err := c.Write(buf.Bytes())
+	// return err
+	c.Write(buf.Bytes())
 }
