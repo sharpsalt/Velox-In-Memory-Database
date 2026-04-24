@@ -4,8 +4,12 @@ package main
 import(
 "flag"
 "log"
-
+"os"
+"os/signal"
+"syscall"
+"sync"  
 "github.com/sharpsalt/Velox-In-Memory-Database/server"
+"github.com/sharpsalt/Velox-In-Memory-Database/config"
 )
 
 var config=&server.Config{}
@@ -25,12 +29,32 @@ func setupFlag(){
 func main(){
 	setupFlag() //we will setup the flags firt
 	log.Println("hello!! is it really running")
-	err:=server.RunAsyncTCPServer(config)
-	if err!=nil{
-		log.Println("Error starting server:", err)
-		return
-	}
+	// err:=server.RunAsyncTCPServer(config)
+	// if err!=nil{
+	// 	log.Println("Error starting server:", err)
+	// 	return
+	// }
 	/*
 	I will be running Synchronous TCP Server means i iwll be starting the TCP connection on give port synchronously
 	*/
+	var sigs cha os.Signal=make(chan os.Signal,1)
+	/*
+	we will listen to interrupts or signals is through a channel
+	so here we are creating a channel who accept of type os.Signal
+
+	and then we are registering it to listen SIGTERM or SIGINT
+	*/
+	signal.Notify(sigs,syscall.SIGTERM,syscall.SIGINT)
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go server.RunAsyncTCPServer(&wg)
+	go server.WaitForSignal(&wg,sigs)
+	/*
+	We are spinning up 2 goroutine
+
+	earlier we had only 1 thread, so currently we have 2thread, 1 is for actual signal(vo mera asynctcpserver)
+	and we will wait till completion 
+	*/
+	wg.Wait()
 }
