@@ -16,9 +16,18 @@ var lastCronExecTime time.Time=time.Now() //and we are maintaining, last time it
 const EngineStatus_BUSY int32=1<<2
 const EngineStatus_WAITING=1<<1
 const EngineStatus_SHUTTING_DOWN int32=1<<3
+const EngineStatus_TRANSACTION int32=1<<4
 
 
 var eStatus int32=EngineStatus_WAITING
+var connectedClients map[int]*core.Client //here we decalred the object 
+/**
+Every Time when a client is getting connected to us, we will get a file descriptor, this key is that particular fiile descriptor 
+**/
+
+func init(){
+	connectedClients=make(map[int]*core.Client) //here we added memory to that
+}
 
 func WaitForSignal(wg *sync.WaitGroup,sigs chan os.Signal){
 	defer wg.Done()
@@ -235,7 +244,8 @@ func RunAsyncTCPServer(cfg *Config) error{
 
 				//increase the number of concurrent clients count
 				con_client++
-				syscall.SetNonblock(fd, true)
+				connectedClients[fd]=core.NewClient(fd)
+				syscall.SetNonblock(serverFD, true)
 
 				//add this new TCP connetion to be monitored
 				var socketClientEvent syscall.EpollEvent = syscall.EpollEvent{
@@ -247,11 +257,16 @@ func RunAsyncTCPServer(cfg *Config) error{
 				}
 			}else{
 				//if it is not my server which means that some client that is already connected to the server, then do somthing
-				comm := core.FDComm{Fd: int(events[i].Fd)}
+				// comm := core.FDComm{Fd: int(events[i].Fd)}
+				comm:=connectedClients[int(events[i].Fd)]
+				if comm==nil{
+					continue
+				}
 				cmds, err := readCommands(comm) //instead of passing 1 command, we will pass many commands
 				if err != nil{
 					syscall.Close(int(events[i].Fd))
 					con_client -= 1
+					delete(connectedClients,int(events[i].Fd))
 					continue
 				}
 				respond(cmds, comm)
