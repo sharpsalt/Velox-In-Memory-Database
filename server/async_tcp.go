@@ -13,6 +13,43 @@ import(
 var con_client int=0
 var cronFrequency time.Duration=1*time.Second //a cron frequency of 1s
 var lastCronExecTime time.Time=time.Now() //and we are maintaining, last time it ran
+const EngineStatus_BUSY int32=1<<2
+const EngineStatus_WAITING=1<<1
+const EngineStatus_SHUTTING_DOWN int32=1<<3
+const EngineStatus_TRANSACTION int32=1<<4
+
+
+var eStatus int32=EngineStatus_WAITING
+var connectedClients map[int]*core.Client //here we decalred the object 
+/**
+Every Time when a client is getting connected to us, we will get a file descriptor, this key is that particular fiile descriptor 
+**/
+
+func init(){
+	connectedClients=make(map[int]*core.Client) //here we added memory to that
+}
+
+func WaitForSignal(wg *sync.WaitGroup,sigs chan os.Signal){
+	defer wg.Done()
+	<-sigs  //this is a blcoking call like until we give a channel
+	//we would not be moving forward
+
+	//if servers is busy cntinue to work
+	for atomic.LoadInt32(&eStatus)==EngineStatus_BUSY{
+	}
+
+	//CRITICAL to hanle
+	//we do not want server to ever go back to BUSY State 
+	//when control flow is here
+
+	//immediately set the status to be SHUTTING _DOWN
+	//the only place where we can set the status to be SHUTTING_DONW
+	atomic.StoreInt32(&eStatus,EngineStatus_SHUTTING_DOWN)
+
+	//if server is in any other statem initiate a shutdown
+	core.ShutDown()
+	os.Exit(0)
+}
 
 // readCommands reads RESP commands from a file descriptor and returns them
 func readCommands(c core.FDComm)([]*core.RedisCmd,error){
@@ -57,6 +94,12 @@ func RunAsyncTCPServer(cfg *Config) error{
 	log.Println("Starting an asynchronous TCP Server on", cfg.Host, cfg.Port)
 	// since humlog linux based system use krrhe hai so 
 	// so we are using epoll
+	defer wg.Done()
+	defer func(){
+		atomic.StoreInt32(&eStatus,EngineStatus_SHUTTING_DOWN)
+	}()
+
+	log.Println("Starting an asynchronous TCP Server on ",config.Host,config.Port)
 	max_clients := 20000
 
 	//create EPOLL Event Objects to hold events 
@@ -137,7 +180,7 @@ func RunAsyncTCPServer(cfg *Config) error{
 		return err
 	}
 
-	for{
+	for atomic.LoadInt32(&eStatus)!=EngineStatus_SHUTTING_DOWN{ //eralier we had infinite for loop so now we will chek it until the server is not shutting down
 		/*
 		The first thing which we do to execute this cron
 
@@ -155,6 +198,10 @@ func RunAsyncTCPServer(cfg *Config) error{
 			core.DeleteExpiredKey()
 			lastCronExecTime = time.Now()
 		}
+		//Say,the Engine triggered SHUTTING down when the control flow is here->
+		//Current: Engine status==WAITING
+		//Update: Engine status==SHUTTING_DOWN
+		//Then we have to exit (handled in Signal handler)
 
 
 
@@ -162,11 +209,26 @@ func RunAsyncTCPServer(cfg *Config) error{
 		//that why i am invoking EPOLL wait
 
 		//see if any FD is ready for an IO
-		nevents, e := syscall.EpollWait(epollFD, events[:], -1)
+		nevents, e := syscall.EpollWait(epollFD, events[:], -1) //EpollWait mtlb some file descriptor is ready for IO 
 		//EpollWait will monitor if any IO is ready, and put it in buffer(evenets buffer), if none is there then the call wouldget blocked
 
 		if e != nil{
 			continue
+		}
+
+		//Here, we do not want server to go back from SHUTTING_DOWN
+		//to BUSY
+		//If the engine status==SHUTTING_DOWN over here-> we have to exit 
+		//hence the only legal transition is from WAITING to BUSY
+		//if that does not happen then we can exit
+
+		//mark engine as BUSY only when it is in the waiting stats
+		if !atomic.CompareAndSwapInt32(&eStatus,EngineStatus_WAITING,EngineStatus_BUSY){
+			//if swap unsuccessful then the exitsing status is not WAITING, but something 
+			switch eStatus{
+			case EngineStatus_SHUTTING_DOWN:
+				return nil
+			}
 		}
 
 		for i := 0; i < nevents; i++{
@@ -182,7 +244,8 @@ func RunAsyncTCPServer(cfg *Config) error{
 
 				//increase the number of concurrent clients count
 				con_client++
-				syscall.SetNonblock(fd, true)
+				connectedClients[fd]=core.NewClient(fd)
+				syscall.SetNonblock(serverFD, true)
 
 				//add this new TCP connetion to be monitored
 				var socketClientEvent syscall.EpollEvent = syscall.EpollEvent{
@@ -194,17 +257,28 @@ func RunAsyncTCPServer(cfg *Config) error{
 				}
 			}else{
 				//if it is not my server which means that some client that is already connected to the server, then do somthing
-				comm := core.FDComm{Fd: int(events[i].Fd)}
+				// comm := core.FDComm{Fd: int(events[i].Fd)}
+				comm:=connectedClients[int(events[i].Fd)]
+				if comm==nil{
+					continue
+				}
 				cmds, err := readCommands(comm) //instead of passing 1 command, we will pass many commands
 				if err != nil{
 					syscall.Close(int(events[i].Fd))
 					con_client -= 1
+					delete(connectedClients,int(events[i].Fd))
 					continue
 				}
 				respond(cmds, comm)
 			}
 		}
+
+		//mark engine as WAITING
+		//no contention as the signal handler is blocked until
+		//the engine is BUSY
+		atomic.StoreInt32(&eStatus<EngineStatus_WAITING)
 	}
+	return nil
 }
 
 /*
