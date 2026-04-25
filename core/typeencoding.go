@@ -41,6 +41,8 @@ func TypeName(te uint8) string {
 		return "list"
 	case OBJ_TYPE_SET:
 		return "set"
+	case OBJ_TYPE_ZSET:
+		return "zset"
 	default:
 		return "none"
 	}
@@ -61,6 +63,8 @@ func EncodingName(te uint8) string {
 		return "quicklist"
 	case OBJ_ENCODING_INTSET:
 		return "intset"
+	case OBJ_ENCODING_SKIPLIST:
+		return "skiplist"
 	case OBJ_ENCODING_EMBSTR:
 		return "embstr"
 	default:
