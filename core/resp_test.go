@@ -12,14 +12,12 @@ func TestSimpleStringDecode(t *testing.T){
 		"+OK\r\n": "OK",
 	}
 	for k, v := range cases{
-		values, _ := core.Decode([]byte(k))
-		// Decode returns []interface{}, get the first value
-		if len(values) == 0 {
+		value, _, _ := core.DecodeOne([]byte(k))
+		if value == nil {
 			t.Fail()
 			continue
 		}
-		value := values[0].(string)
-		if v != value{
+		if v != value.(string){
 			t.Fail()
 		}
 	}
@@ -30,14 +28,12 @@ func TestError(t *testing.T){
 		"-Error Message\r\n": "Error Message",
 	}
 	for k, v := range cases{
-		values, _ := core.Decode([]byte(k))
-		// Decode returns []interface{}, get the first value
-		if len(values) == 0 {
+		value, _, _ := core.DecodeOne([]byte(k))
+		if value == nil {
 			t.Fail()
 			continue
 		}
-		value := values[0].(string)
-		if v != value{
+		if v != value.(string){
 			t.Fail()
 		}
 	}
@@ -50,14 +46,12 @@ func TestInt64(t *testing.T) {
 	}
 
 	for k, v := range cases {
-		values, _ := core.Decode([]byte(k))
-		// Decode returns []interface{}, get the first value
-		if len(values) == 0 {
+		value, _, _ := core.DecodeOne([]byte(k))
+		if value == nil {
 			t.Fail()
 			continue
 		}
-		value := values[0].(int64)
-		if v != value {
+		if v != value.(int64) {
 			t.Fail()
 		}
 	}
@@ -69,14 +63,12 @@ func TestBulkStringDecode(t *testing.T) {
 		"$0\r\n\r\n":      "",
 	}
 	for k, v := range cases{
-		values, _ := core.Decode([]byte(k))
-		// Decode returns []interface{}, get the first value
-		if len(values) == 0 {
+		value, _, _ := core.DecodeOne([]byte(k))
+		if value == nil {
 			t.Fail()
 			continue
 		}
-		value := values[0].(string)
-		if v != value{
+		if v != value.(string){
 			t.Fail()
 		}
 	}
@@ -91,13 +83,11 @@ func TestArrayDecode(t *testing.T) {
 		"*2\r\n*3\r\n:1\r\n:2\r\n:3\r\n*2\r\n+Hello\r\n-World\r\n": {[]interface{}{int64(1), int64(2), int64(3)}, []interface{}{"Hello", "World"}},
 	}
 	for k, v := range cases {
-		values, _ := core.Decode([]byte(k))
-		// Decode returns []interface{}, get the first element
-		if len(values) == 0 {
+		value, _, _ := core.DecodeOne([]byte(k))
+		if value == nil {
 			t.Fail()
 			continue
 		}
-		value := values[0]
 		
 		switch array := value.(type) {
 		case []interface{}:
