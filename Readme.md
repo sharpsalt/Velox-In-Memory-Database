@@ -912,6 +912,5 @@ go test -race ./...
 
 ---
 
-//## License
-
-//MIT — see `LICENSE` for details.
+## License
+MIT — see `LICENSE` for details.
