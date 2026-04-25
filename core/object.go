@@ -33,6 +33,7 @@ var OBJ_TYPE_STRING uint8=0<<4 //because first 4 bits i want to set
 var OBJ_TYPE_HASH   uint8=1<<4 //hash type
 var OBJ_TYPE_LIST   uint8=2<<4 //list type
 var OBJ_TYPE_SET    uint8=3<<4 //set type
+var OBJ_TYPE_ZSET   uint8=4<<4 //zset type
 
 var OBJ_ENCODING_RAW      uint8=0
 var OBJ_ENCODING_INT      uint8=1
@@ -40,6 +41,7 @@ var OBJ_ENCODING_ZIPLIST   uint8=2 //compact sequential storage for small hashes
 var OBJ_ENCODING_HT        uint8=3 //hashtable encoding (map[string]string for hashes, map[string]struct{} for sets)
 var OBJ_ENCODING_QUICKLIST  uint8=4 //linked list of ziplists (used for lists)
 var OBJ_ENCODING_INTSET     uint8=5 //sorted integer array (used for small integer-only sets)
+var OBJ_ENCODING_SKIPLIST   uint8=6 //probabilistic skip list (used for sorted sets)
 var OBJ_ENCODING_EMBSTR uint8=8 //Object encoding is embedded string
 
 
