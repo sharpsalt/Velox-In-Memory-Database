@@ -7,7 +7,6 @@ import(
 "log"
 "net"
 "strconv"
-"strings"
 
 "github.com/sharpsalt/Velox-In-Memory-Database/core"
 )
@@ -34,47 +33,12 @@ func readCommand(c net.Conn) ([]*core.RedisCmd, error) {
 	if err != nil{
 		return nil, err
 	}
-	/*
-	Pipelining-> me ka
-	     like earlier we used to decode once, but ab we are continuously decoding it
-		 the idea here is we would want to accept multiple commands 
-		 so we want commands back to back literally concatenated
-
-	*/
-	values,err:=core.Decode(buf[:n])
-	if err!=nil{
-		return nil,err
-	}
-	/*
-	and decoding it into an array of strings
-	when any redis cleint wants to issue a command to redis server then a command typically has 
-	root command and argument,all of them is sent to as an array of strings so if  am doing PUT key,value-> then it will sends as array of strings 
-	*/
-	// tokens,err:=core.DecodeArrayString(buf[:n])
-	// if err!=nil{
-	// 	return nil,err
-	// }
-	// // return val.(*core.Command), nil
-	// //once we had tokens we are creating redis command object and passing the root command in which tokens[0] will become command and rest will become the argument 
-	// return &core.Rediscmd{
-	// 	Cmd:strings.ToUpper(tokens[0]),
-	// 	Args: tokens[1:],
-	// },nil
-
-	var cmds []*core.RedisCmd = make([]*core.RedisCmd, 0)
-	for _, value := range values{
-		tokens, err := core.ToArrayString(value.([]interface{}))
-		if err != nil{
-			return nil, err
-		}
-		//so here are we 
-		cmds = append(cmds, &core.RedisCmd{
-			Cmd:  strings.ToUpper(tokens[0]),
-			Args: tokens[1:],
-		})
-	}
-	return cmds, nil
+	// PERF: Zero-allocation decoder. Parses the byte slice directly into 
+	// a pooled slice of pooled RedisCmd structs, completely avoiding the
+	// intermediate []interface{} and []string allocations.
+	return core.DecodeCommands(buf[:n])
 }
+
 
 func respondError(err error, c io.ReadWriter){
 	//It write on TCP socket of stream of bytes where we are dping stream formatting 
@@ -139,6 +103,7 @@ func RunSyncTCPServer(cfg *Config){
 		}
 		//incrementing the number of concurrent clients
 		con_client += 1
+		core.TrackConnection()
 		log.Println("Client connected with address: ", c.RemoteAddr(), "concurrent clients", con_client)
 		/*
 		Another infinite loop for
@@ -167,6 +132,7 @@ func RunSyncTCPServer(cfg *Config){
 			}
 			log.Println("command", cmds)
 			respondSync(cmds, c)
+			core.FreeCmds(cmds) // PERF: Return commands to sync.Pool
 		}
 	}
 }
