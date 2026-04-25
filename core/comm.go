@@ -43,30 +43,30 @@ func (c *Client) TxnExec() []byte{
 	var out []byte
 	buf:=bytes.NewBuffer(out)
 
-	buf.WriteString(frm.Sprintf("*%d\r\n",len(c.cqueue)))
+	buf.WriteString(fmt.Sprintf("*%d\r\n",len(c.enqueue)))
 
-	for _,_cmd:=range c.cqueue{
-		buf.Write(executeCommand(_cmd,c))
+	for _,cmd:=range c.enqueue{
+		buf.Write(executeCommand(cmd,c))
 	}
 
-	c.cqueue=make(RedisCmd,0)
+	c.enqueue=make(RedisCmds,0)
 	c.isTxn=false
 	return buf.Bytes()
 }
 
 func (c *Client) TxnDiscard(){
-	c.cqueue=make(RedisCmds,0)
+	c.enqueue=make(RedisCmds,0)
 	c.isTxn=false
 }
 
 func (c *Client) TxnQueue(cmd *RedisCmd){
-	c.cqueue=append(c.cqueue,cmd)
+	c.enqueue=append(c.enqueue,cmd)
 }
 
 func NewClient(fd int) *Client{
 	return &Client{
 		Fd:    fd,
-		enqueue: amke(Rediscmds,0)
+		enqueue: make(RedisCmds,0),
 	}
 }
 
