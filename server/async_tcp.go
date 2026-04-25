@@ -3,10 +3,14 @@ package server
 import(
 	"log"
 	"net"
+	"os"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
+	"github.com/sharpsalt/Velox-In-Memory-Database/config"
 	"github.com/sharpsalt/Velox-In-Memory-Database/core"
 )
 
@@ -41,16 +45,52 @@ func WaitForSignal(wg *sync.WaitGroup,sigs chan os.Signal){
 	core.ShutDown()
 	os.Exit(0)
 }
+const EngineStatus_WAITING int32=1<<1
+const EngineStatus_SHUTTING_DOWN int32=1<<3
+const EngineStatus_TRANSACTION int32=1<<4
 
-// readCommands reads RESP commands from a file descriptor and returns them
-func readCommands(c core.FDComm)([]*core.RedisCmd,error){
+
+var eStatus int32=EngineStatus_WAITING
+var connectedClients map[int]*core.Client //here we decalred the object 
+/**
+Every Time when a client is getting connected to us, we will get a file descriptor, this key is that particular fiile descriptor 
+**/
+
+func init(){
+	connectedClients=make(map[int]*core.Client) //here we added memory to that
+}
+
+func WaitForSignal(wg *sync.WaitGroup,sigs chan os.Signal){
+	defer wg.Done()
+	<-sigs  //this is a blcoking call like until we give a channel
+	//we would not be moving forward
+
+	//if servers is busy cntinue to work
+	for atomic.LoadInt32(&eStatus)==EngineStatus_BUSY{
+	}
+
+	//CRITICAL to hanle
+	//we do not want server to ever go back to BUSY State 
+	//when control flow is here
+
+	//immediately set the status to be SHUTTING _DOWN
+	//the only place where we can set the status to be SHUTTING_DONW
+	atomic.StoreInt32(&eStatus,EngineStatus_SHUTTING_DOWN)
+
+	//if server is in any other statem initiate a shutdown
+	core.Shutdown()
+	os.Exit(0)
+}
+
+// readCommands reads RESP commands from a client and returns them
+func readCommands(c *core.Client)([]*core.RedisCmd,error){
 	/*
 	Take the socket connection and basically fire the system call Read
 	It is listening over the socket and it is trying to read message over the socket 
 	if there is nothing that is coming from my client then it is a blocking call, until i get something from client 
 	when we read it we put it into buffer and then, we get the number of bytes , if there is error we throw error else we send it back 
 	*/
-	var buf []byte=make([]byte,512)
+	var buf []byte=make([]byte,64*1024) // #3 FIX: 64KB buffer instead of 512 bytes — handles real-world payloads
 	n,err:=c.Read(buf[:])//reading it in buffer from Client
 	if err!=nil{
 		return nil, err
@@ -81,8 +121,7 @@ func readCommands(c core.FDComm)([]*core.RedisCmd,error){
 	return cmds, nil
 }
 
-func RunAsyncTCPServer(cfg *Config) error{
-	log.Println("Starting an asynchronous TCP Server on", cfg.Host, cfg.Port)
+func RunAsyncTCPServer(wg *sync.WaitGroup) error{
 	// since humlog linux based system use krrhe hai so 
 	// so we are using epoll
 	defer wg.Done()
@@ -127,9 +166,9 @@ func RunAsyncTCPServer(cfg *Config) error{
 	}
 
 	//Bind the IP and the port
-	ip4 := net.ParseIP(cfg.Host).To4()
+	ip4 := net.ParseIP(config.Host).To4()
 	if err = syscall.Bind(serverFD, &syscall.SockaddrInet4{
-		Port: cfg.Port,
+		Port: config.Port,
 		Addr: [4]byte{ip4[0], ip4[1], ip4[2], ip4[3]},
 	}); err != nil{
 		return err
@@ -202,6 +241,12 @@ func RunAsyncTCPServer(cfg *Config) error{
 		//see if any FD is ready for an IO
 		nevents, e := syscall.EpollWait(epollFD, events[:], -1) //EpollWait mtlb some file descriptor is ready for IO 
 		//EpollWait will monitor if any IO is ready, and put it in buffer(evenets buffer), if none is there then the call wouldget blocked
+		// #10 FIX: 100ms timeout instead of -1 (blocking forever)
+		// With -1, the cron job (DeleteExpiredKey) would NEVER run because
+		// EpollWait blocks until an IO event arrives. With 100ms timeout,
+		// we wake up periodically to check cron and shutdown status.
+		nevents, e := syscall.EpollWait(epollFD, events[:], 100)
+		//EpollWait will monitor if any IO is ready, and put it in buffer(evenets buffer)
 
 		if e != nil{
 			continue
@@ -235,6 +280,7 @@ func RunAsyncTCPServer(cfg *Config) error{
 
 				//increase the number of concurrent clients count
 				con_client++
+				connectedClients[fd]=core.NewClient(fd)
 				syscall.SetNonblock(fd, true)
 
 				//add this new TCP connetion to be monitored
@@ -247,14 +293,19 @@ func RunAsyncTCPServer(cfg *Config) error{
 				}
 			}else{
 				//if it is not my server which means that some client that is already connected to the server, then do somthing
-				comm := core.FDComm{Fd: int(events[i].Fd)}
+				// comm := core.FDComm{Fd: int(events[i].Fd)}
+				comm:=connectedClients[int(events[i].Fd)]
+				if comm==nil{
+					continue
+				}
 				cmds, err := readCommands(comm) //instead of passing 1 command, we will pass many commands
 				if err != nil{
 					syscall.Close(int(events[i].Fd))
 					con_client -= 1
+					delete(connectedClients,int(events[i].Fd))
 					continue
 				}
-				respond(cmds, comm)
+				respondAsync(cmds, comm)
 			}
 		}
 
@@ -264,6 +315,14 @@ func RunAsyncTCPServer(cfg *Config) error{
 		atomic.StoreInt32(&eStatus<EngineStatus_WAITING)
 	}
 	return nil
+		atomic.StoreInt32(&eStatus, EngineStatus_WAITING)
+	}
+	return nil
+}
+
+// respondAsync calls EvalAndRespond for the async server path
+func respondAsync(cmds []*core.RedisCmd, c *core.Client) {
+	core.EvalAndRespond(cmds, c)
 }
 
 /*

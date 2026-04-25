@@ -5,6 +5,9 @@ import (
 	"time"
 )
 
+// NOTE: hasExpired and getExpiry access the expires map
+// The caller is responsible for holding the appropriate lock (storeMu.RLock or storeMu.Lock)
+
 func hasExpired(obj *Obj) bool{
 	exp,ok:=expires[obj]
 	if !ok{
@@ -28,6 +31,10 @@ func expireSample() float32{
 	var limit int = 20
 	var expiresCount int = 0
 
+	// We acquire the write lock since we may delete keys
+	storeMu.Lock()
+	defer storeMu.Unlock()
+
 	//assuming iteration of golang hash table in randomized    
 	for key, obj := range store{
 		// if obj.ExpiresAt != -1{
@@ -39,7 +46,7 @@ func expireSample() float32{
 		// 	}
 		// }
 		if hasExpired(obj){
-			delete(store,key)
+			delLocked(key)
 			expiresCount++
 			limit--
 		}
@@ -64,5 +71,5 @@ func DeleteExpiredKey(){
 			break
 		}
 	}//a normal active deletion flow would happen like it 
-	log.Println("deleted the expired but undeleted logs, total keys ", len(store))
+	log.Println("deleted the expired but undeleted logs, total keys ", StoreLen())
 }
