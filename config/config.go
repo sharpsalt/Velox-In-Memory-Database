@@ -21,3 +21,15 @@ var EvictionStrategy string = "allkeys-lru"
 var LRUSampleSize int = 5
 
 var AOFFile string = "./velox.aof"
+
+// Hash encoding promotion thresholds
+// When a hash exceeds these limits, it converts from ziplist to hashtable
+var HashMaxZiplistEntries int = 128  // max number of field-value pairs in ziplist encoding
+var HashMaxZiplistValue int = 64     // max byte length of any field or value in ziplist encoding
+
+// List: max entries per ziplist node inside the quicklist
+var ListMaxZiplistSize int = 128
+
+// Set encoding promotion threshold
+// When a set exceeds this many entries, or gets a non-integer member, it converts from intset to hashtable
+var SetMaxIntsetEntries int = 512
