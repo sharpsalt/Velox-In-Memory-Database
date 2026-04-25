@@ -127,48 +127,37 @@ func ReplayAOF(){
 	}
 
 	// Decode all the RESP-encoded commands from the file
-	values, err := Decode(buf[:n])
+	cmds, err := DecodeCommands(buf[:n])
 	if err != nil {
 		log.Println("error decoding AOF file:", err)
 		return
 	}
 
 	var replayedCount int
-	for _, value := range values {
-		// Each value should be an array (a RESP command)
-		arr, ok := value.([]interface{})
-		if !ok {
-			continue
-		}
-		tokens := make([]string, len(arr))
-		for i, v := range arr {
-			tokens[i] = fmt.Sprintf("%v", v)
-		}
-		if len(tokens) == 0 {
-			continue
-		}
+	for _, c := range cmds {
+		cmd := strings.ToUpper(c.Cmd)
+		args := c.Args
 
 		// Replay supported commands
-		cmd := strings.ToUpper(tokens[0])
 		switch cmd {
 		case "SET":
-			if len(tokens) >= 3 {
-				evalSET(tokens[1:])
+			if len(args) >= 2 {
+				evalSET(args)
 				replayedCount++
 			}
 		case "HSET":
-			if len(tokens) >= 4 {
-				evalHSET(tokens[1:])
+			if len(args) >= 2 {
+				evalHSET(args)
 				replayedCount++
 			}
 		case "RPUSH":
-			if len(tokens) >= 3 {
-				evalRPUSH(tokens[1:])
+			if len(args) >= 2 {
+				evalRPUSH(args)
 				replayedCount++
 			}
 		case "SADD":
-			if len(tokens) >= 3 {
-				evalSADD(tokens[1:])
+			if len(args) >= 2 {
+				evalSADD(args)
 				replayedCount++
 			}
 		}
