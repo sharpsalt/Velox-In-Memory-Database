@@ -1,6 +1,7 @@
 package server
 
 import(
+"bytes"
 "fmt"
 "io"
 "log"
@@ -28,7 +29,7 @@ func readCommand(c net.Conn) ([]*core.RedisCmd, error) {
 	if there is nothing taht is coming from my lcient then it is a blocking call, until i get somehting from client 
 	when we read it we put it into buffer and then, we get the number of bytes , if there is error we throw errer else we send it back 
 	*/
-	var buf []byte = make([]byte, 512)
+	var buf []byte = make([]byte, 64*1024) // #3 FIX: 64KB buffer instead of 512 bytes
 	n, err := c.Read(buf[:])//reading it in buffer from Client
 	if err != nil{
 		return nil, err
@@ -84,23 +85,33 @@ func respondError(err error, c io.ReadWriter){
 	c.Write([]byte(fmt.Sprintf("-%s\r\n", err)))
 }
 
-func respond(cmds []*core.RedisCmd, c io.ReadWriter) error{//Responding with connection
+func respondSync(cmds []*core.RedisCmd, c net.Conn){//Responding with connection
 	//we passed give the command and given the socket connection, just writing it back over the socket
 	//like whatever we got we are sending it back to the client
-	err := core.EvalAndRespond(cmds, c)//basically respond command is evaluating as well as responding
-	if err != nil{
+
+	// Wrap net.Conn as a Client for EvalAndRespond
+	// For sync server, we create a temporary client wrapper
+	client := &core.Client{Fd: -1} // Fd=-1 since we use net.Conn's Write
+	// We can't directly use net.Conn with EvalAndRespond which expects *Client
+	// So we handle it manually
+	var response []byte
+	buf := &bytes.Buffer{}
+	for _, cmd := range cmds {
+		buf.Write(core.ExecuteCommandPublic(cmd, client))
+	}
+	response = buf.Bytes()
+	_, err := c.Write(response)
+	if err != nil {
 		respondError(err, c)
-		return err
 	}
 	/*
 	Basically we are building an echo server like whatever we are getting from client, we are sending it back to him
 	*/
-	return nil
 }
 
-func RunSyncTCPServer(config *Config){
+func RunSyncTCPServer(cfg *Config){
 
-	log.Println("startign a synchronous TCP Server on", config.Host, config.Port)
+	log.Println("startign a synchronous TCP Server on", cfg.Host, cfg.Port)
 	var con_client int = 0
 	//this will hold the number of concurrent client that are connceted at the moment
 	/*
@@ -112,7 +123,7 @@ func RunSyncTCPServer(config *Config){
 	Our server will start listening to the port that means any of the client can talk to server from the port upon which it is listening to
 	once  our server is started then i will run an infinite loop like you can see below
 	*/
-	lsnr, err := net.Listen("tcp", config.Host+":"+strconv.Itoa(config.Port))
+	lsnr, err := net.Listen("tcp", cfg.Host+":"+strconv.Itoa(cfg.Port))
 	if err != nil{
 		panic(err)
 	}
@@ -155,9 +166,7 @@ func RunSyncTCPServer(config *Config){
 				continue
 			}
 			log.Println("command", cmds)
-			if err := respond(cmds, c); err != nil{
-				log.Println("error responding", err)
-			}
+			respondSync(cmds, c)
 		}
 	}
 }
