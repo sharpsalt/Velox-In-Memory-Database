@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"path"
 	"strconv"
 	"time"
 	"strings"
@@ -76,6 +77,179 @@ func evalINCR(args []string)[]byte{
 	obj.Value = strconv.FormatInt(i, 10)
 
 	return Encode(i, false)
+}
+
+// DECR key — decrements the integer value by 1
+func evalDECR(args []string) []byte {
+	if len(args) != 1 {
+		return Encode(errors.New("ERR wrong number of arguments for 'decr' command"), false)
+	}
+	key := args[0]
+	obj := Get(key)
+	if obj == nil {
+		obj = NewObj("0", -1, OBJ_TYPE_STRING, OBJ_ENCODING_INT)
+		Put(key, obj)
+	}
+	if err := assertType(obj.TypeEncoding, OBJ_TYPE_STRING); err != nil {
+		return Encode(err, false)
+	}
+	if err := assertEncoding(obj.TypeEncoding, OBJ_ENCODING_INT); err != nil {
+		return Encode(err, false)
+	}
+	i, _ := strconv.ParseInt(obj.Value.(string), 10, 64)
+	i--
+	obj.Value = strconv.FormatInt(i, 10)
+	return Encode(i, false)
+}
+
+// INCRBY key increment — increments the integer value by the given amount
+func evalINCRBY(args []string) []byte {
+	if len(args) != 2 {
+		return Encode(errors.New("ERR wrong number of arguments for 'incrby' command"), false)
+	}
+	key := args[0]
+	incr, err := strconv.ParseInt(args[1], 10, 64)
+	if err != nil {
+		return Encode(errors.New("ERR value is not an integer or out of range"), false)
+	}
+	obj := Get(key)
+	if obj == nil {
+		obj = NewObj("0", -1, OBJ_TYPE_STRING, OBJ_ENCODING_INT)
+		Put(key, obj)
+	}
+	if err := assertType(obj.TypeEncoding, OBJ_TYPE_STRING); err != nil {
+		return Encode(err, false)
+	}
+	if err := assertEncoding(obj.TypeEncoding, OBJ_ENCODING_INT); err != nil {
+		return Encode(err, false)
+	}
+	i, _ := strconv.ParseInt(obj.Value.(string), 10, 64)
+	i += incr
+	obj.Value = strconv.FormatInt(i, 10)
+	return Encode(i, false)
+}
+
+// DECRBY key decrement — decrements the integer value by the given amount
+func evalDECRBY(args []string) []byte {
+	if len(args) != 2 {
+		return Encode(errors.New("ERR wrong number of arguments for 'decrby' command"), false)
+	}
+	key := args[0]
+	decr, err := strconv.ParseInt(args[1], 10, 64)
+	if err != nil {
+		return Encode(errors.New("ERR value is not an integer or out of range"), false)
+	}
+	obj := Get(key)
+	if obj == nil {
+		obj = NewObj("0", -1, OBJ_TYPE_STRING, OBJ_ENCODING_INT)
+		Put(key, obj)
+	}
+	if err := assertType(obj.TypeEncoding, OBJ_TYPE_STRING); err != nil {
+		return Encode(err, false)
+	}
+	if err := assertEncoding(obj.TypeEncoding, OBJ_ENCODING_INT); err != nil {
+		return Encode(err, false)
+	}
+	i, _ := strconv.ParseInt(obj.Value.(string), 10, 64)
+	i -= decr
+	obj.Value = strconv.FormatInt(i, 10)
+	return Encode(i, false)
+}
+
+// MSET key1 value1 key2 value2 ... — sets multiple key-value pairs atomically
+func evalMSET(args []string) []byte {
+	if len(args) < 2 || len(args)%2 != 0 {
+		return Encode(errors.New("ERR wrong number of arguments for 'mset' command"), false)
+	}
+	for i := 0; i < len(args); i += 2 {
+		key, value := args[i], args[i+1]
+		otype, oEnc := deduceTypeEncoding(value)
+		Put(key, NewObj(value, -1, otype, oEnc))
+	}
+	return RESP_OK
+}
+
+// MGET key1 key2 ... — returns the values for all given keys
+func evalMGET(args []string) []byte {
+	if len(args) < 1 {
+		return Encode(errors.New("ERR wrong number of arguments for 'mget' command"), false)
+	}
+	results := make([]string, len(args))
+	for i, key := range args {
+		obj := Get(key)
+		if obj == nil || hasExpired(obj) {
+			results[i] = "(nil)"
+		} else {
+			results[i] = fmt.Sprintf("%v", obj.Value)
+		}
+	}
+	return Encode(results, false)
+}
+
+// EXISTS key [key ...] — returns the count of how many of the given keys exist
+func evalEXISTS(args []string) []byte {
+	if len(args) < 1 {
+		return Encode(errors.New("ERR wrong number of arguments for 'exists' command"), false)
+	}
+	count := 0
+	for _, key := range args {
+		obj := Get(key)
+		if obj != nil {
+			count++
+		}
+	}
+	return Encode(int64(count), false)
+}
+
+// KEYS pattern — returns all keys matching the given glob pattern
+// Uses Go's path.Match for glob matching (supports *, ?, [...])
+func evalKEYS(args []string) []byte {
+	if len(args) != 1 {
+		return Encode(errors.New("ERR wrong number of arguments for 'keys' command"), false)
+	}
+	pattern := args[0]
+	var matched []string
+
+	storeMu.RLock()
+	for k := range store {
+		if ok, _ := path.Match(pattern, k); ok {
+			matched = append(matched, k)
+		}
+	}
+	storeMu.RUnlock()
+
+	if matched == nil {
+		matched = []string{}
+	}
+	return Encode(matched, false)
+}
+
+// DBSIZE — returns the number of keys in the current database
+func evalDBSIZE(args []string) []byte {
+	return Encode(int64(StoreLen()), false)
+}
+
+// FLUSHDB — deletes all keys in the current database
+func evalFLUSHDB(args []string) []byte {
+	storeMu.Lock()
+	store = make(map[string]*Obj)
+	expires = make(map[*Obj]uint64)
+	KeyspaceStat[0]["keys"] = 0
+	storeMu.Unlock()
+	return RESP_OK
+}
+
+// TYPE key — returns the type of the value stored at key
+func evalTYPE(args []string) []byte {
+	if len(args) != 1 {
+		return Encode(errors.New("ERR wrong number of arguments for 'type' command"), false)
+	}
+	obj := Get(args[0])
+	if obj == nil {
+		return Encode("none", true)
+	}
+	return Encode(TypeName(obj.TypeEncoding), true)
+
 }
 
 
@@ -381,17 +555,7 @@ func evalOBJECT(args []string) []byte {
 		if obj == nil {
 			return RESP_NIL
 		}
-		enc := getEncoding(obj.TypeEncoding)
-		switch enc {
-		case OBJ_ENCODING_RAW:
-			return Encode("raw", false)
-		case OBJ_ENCODING_INT:
-			return Encode("int", false)
-		case OBJ_ENCODING_EMBSTR:
-			return Encode("embstr", false)
-		default:
-			return Encode("unknown", false)
-		}
+		return Encode(EncodingName(obj.TypeEncoding), false)
 
 	case "HELP":
 		return Encode("OBJECT subcommands: IDLETIME <key>, ENCODING <key>, HELP", false)
@@ -422,6 +586,16 @@ func executeCommand(cmd *RedisCmd, c *Client) []byte{
 			return evalBGREWRITEAOF(cmd.Args)
 		case "INCR":
 			return evalINCR(cmd.Args)
+		case "DECR":
+			return evalDECR(cmd.Args)
+		case "INCRBY":
+			return evalINCRBY(cmd.Args)
+		case "DECRBY":
+			return evalDECRBY(cmd.Args)
+		case "MSET":
+			return evalMSET(cmd.Args)
+		case "MGET":
+			return evalMGET(cmd.Args)
 		case "INFO":
 			return evalINFO(cmd.Args)
 		case "CLIENT":  
@@ -449,11 +623,71 @@ func executeCommand(cmd *RedisCmd, c *Client) []byte{
 			c.TxnDiscard()
 			return RESP_OK
 		case "COMMAND":
-			// redis-cli sends COMMAND on connect and COMMAND DOCS on connect
-			// We respond with an empty array to satisfy the handshake
 			return Encode("OK", true)
+		// --- Utility commands ---
+		case "EXISTS":
+			return evalEXISTS(cmd.Args)
+		case "KEYS":
+			return evalKEYS(cmd.Args)
+		case "DBSIZE":
+			return evalDBSIZE(cmd.Args)
+		case "FLUSHDB":
+			return evalFLUSHDB(cmd.Args)
+		case "TYPE":
+			return evalTYPE(cmd.Args)
+		// --- Hash commands ---
+		case "HSET":
+			return evalHSET(cmd.Args)
+		case "HGET":
+			return evalHGET(cmd.Args)
+		case "HGETALL":
+			return evalHGETALL(cmd.Args)
+		case "HDEL":
+			return evalHDEL(cmd.Args)
+		case "HLEN":
+			return evalHLEN(cmd.Args)
+		case "HEXISTS":
+			return evalHEXISTS(cmd.Args)
+		case "HKEYS":
+			return evalHKEYS(cmd.Args)
+		case "HVALS":
+			return evalHVALS(cmd.Args)
+		case "HINCRBY":
+			return evalHINCRBY(cmd.Args)
+		case "HSETNX":
+			return evalHSETNX(cmd.Args)
+		// --- List commands ---
+		case "LPUSH":
+			return evalLPUSH(cmd.Args)
+		case "RPUSH":
+			return evalRPUSH(cmd.Args)
+		case "LPOP":
+			return evalLPOP(cmd.Args)
+		case "RPOP":
+			return evalRPOP(cmd.Args)
+		case "LRANGE":
+			return evalLRANGE(cmd.Args)
+		case "LLEN":
+			return evalLLEN(cmd.Args)
+		case "LINDEX":
+			return evalLINDEX(cmd.Args)
+		// --- Set commands ---
+		case "SADD":
+			return evalSADD(cmd.Args)
+		case "SREM":
+			return evalSREM(cmd.Args)
+		case "SMEMBERS":
+			return evalSMEMBERS(cmd.Args)
+		case "SISMEMBER":
+			return evalSISMEMBER(cmd.Args)
+		case "SCARD":
+			return evalSCARD(cmd.Args)
+		case "SINTER":
+			return evalSINTER(cmd.Args)
+		case "SUNION":
+			return evalSUNION(cmd.Args)
 		default:
-			return evalPING(cmd.Args)
+			return Encode(errors.New("ERR unknown command '"+cmd.Cmd+"'"), false)
 		}
 }
 
