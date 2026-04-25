@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"strconv"
 	"time"
 	"strings"
+
+	"github.com/sharpsalt/Velox-In-Memory-Database/config"
 )
 
 
@@ -316,7 +317,7 @@ func evalSLEEP(args []string)[]byte{
 		return Encode(errors.New("ERR wrong number of arguments for 'SLEEP' command"),false)
 	}
 
-	DurationSec,err:=strconv.ParseInt(args[0],10,64)
+	durationSec,err:=strconv.ParseInt(args[0],10,64)
 	if err!=nil{
 		return Encode(errors.New("ERR value is not an integer or out of range"),false)
 	}
@@ -324,41 +325,115 @@ func evalSLEEP(args []string)[]byte{
 	return RESP_OK
 }
 
-func evalMULTI(agrs []string)[]byte{
+func evalMULTI(args []string)[]byte{
 	return RESP_OK
 }
 
+// evalLRU returns diagnostics about the approximated LRU eviction system
+// Shows: eviction strategy, sample size, pool size, top candidate idle time, keys count/limit
+func evalLRU(args []string) []byte {
+	poolSize, topIdle := ePool.PoolStats()
 
-func executeCommand(cmds *RedisCmd, c *Client) []byte{
+	var info []byte
+	buf := bytes.NewBuffer(info)
+	buf.WriteString(fmt.Sprintf("# Approximated LRU Stats\r\n"))
+	buf.WriteString(fmt.Sprintf("eviction_strategy:%s\r\n", config.EvictionStrategy))
+	buf.WriteString(fmt.Sprintf("lru_sample_size:%d\r\n", config.LRUSampleSize))
+	buf.WriteString(fmt.Sprintf("eviction_pool_size:%d/%d\r\n", poolSize, 16))
+	buf.WriteString(fmt.Sprintf("pool_top_idle_seconds:%d\r\n", topIdle))
+	buf.WriteString(fmt.Sprintf("keys_count:%d\r\n", StoreLen()))
+	buf.WriteString(fmt.Sprintf("keys_limit:%d\r\n", config.KeysLimit))
+	buf.WriteString(fmt.Sprintf("eviction_ratio:%.2f\r\n", config.EvictionRatio))
+
+	return Encode(buf.String(), false)
+}
+
+// evalOBJECT implements the OBJECT command (subset)
+// Supports:
+//   OBJECT IDLETIME <key> — returns idle time in seconds (how long since last access)
+//   OBJECT HELP           — shows available subcommands
+//   OBJECT ENCODING <key> — returns encoding type of the value
+func evalOBJECT(args []string) []byte {
+	if len(args) == 0 {
+		return Encode(errors.New("ERR wrong number of arguments for 'OBJECT' command"), false)
+	}
+
+	sub := strings.ToUpper(args[0])
+	switch sub {
+	case "IDLETIME":
+		// OBJECT IDLETIME <key> — returns how many seconds since the key was last accessed
+		// This is the core debugging tool for approximated LRU
+		if len(args) < 2 {
+			return Encode(errors.New("ERR wrong number of arguments for 'OBJECT IDLETIME'"), false)
+		}
+		idleTime, exists := GetKeyIdleTime(args[1])
+		if !exists {
+			return RESP_NIL
+		}
+		return Encode(int64(idleTime), false)
+
+	case "ENCODING":
+		// OBJECT ENCODING <key> — returns the internal encoding of the value
+		if len(args) < 2 {
+			return Encode(errors.New("ERR wrong number of arguments for 'OBJECT ENCODING'"), false)
+		}
+		obj := Get(args[1])
+		if obj == nil {
+			return RESP_NIL
+		}
+		enc := getEncoding(obj.TypeEncoding)
+		switch enc {
+		case OBJ_ENCODING_RAW:
+			return Encode("raw", false)
+		case OBJ_ENCODING_INT:
+			return Encode("int", false)
+		case OBJ_ENCODING_EMBSTR:
+			return Encode("embstr", false)
+		default:
+			return Encode("unknown", false)
+		}
+
+	case "HELP":
+		return Encode("OBJECT subcommands: IDLETIME <key>, ENCODING <key>, HELP", false)
+
+	default:
+		return Encode(errors.New("ERR unknown subcommand for OBJECT"), false)
+	}
+}
+
+
+func executeCommand(cmd *RedisCmd, c *Client) []byte{
 	//It's job is like depending on what job is sent to us
 	//we trigger the corresponding eval function
 		switch cmd.Cmd{
 		case "PING":
-			evalPING(cmd.Args)
+			return evalPING(cmd.Args)
 		case "SET":
-			evalSET(cmd.Args)
+			return evalSET(cmd.Args)
 		case "GET":
-			evalGET(cmd.Args)
+			return evalGET(cmd.Args)
 		case "TTL":
-			evalTTL(cmd.Args)
+			return evalTTL(cmd.Args)
 		case "DEL":
-			evalDEL(cmd.Args)
+			return evalDEL(cmd.Args)
 		case "EXPIRE":
-			evalEXPIRE(cmd.Args)
+			return evalEXPIRE(cmd.Args)
 		case "BGREWRITEAOF":
-			evalBGREWRITEAOF(cmd.Args)
+			return evalBGREWRITEAOF(cmd.Args)
 		case "INCR":
-			evalINCR(cmd.Args)
+			return evalINCR(cmd.Args)
 		case "INFO":
-			evalINFO(cmd.Args)
+			return evalINFO(cmd.Args)
 		case "CLIENT":  
-			evalCLIENT(cmd.Args)
+			return evalCLIENT(cmd.Args)
 		case "LATENCY": 
-			evalLATENCY(cmd.Args)
+			return evalLATENCY(cmd.Args)
 		case "LRU":
-			evalLRU(cmd.Args)
+			return evalLRU(cmd.Args)
+		case "OBJECT":
+			return evalOBJECT(cmd.Args)
 		case "SLEEP":
-			evalSLEEP(cmd.Args)
+			return evalSLEEP(cmd.Args)
 		case "MULTI":
 			c.TxnBegin()
 			return evalMULTI(cmd.Args)
@@ -373,6 +448,10 @@ func executeCommand(cmds *RedisCmd, c *Client) []byte{
 			}
 			c.TxnDiscard()
 			return RESP_OK
+		case "COMMAND":
+			// redis-cli sends COMMAND on connect and COMMAND DOCS on connect
+			// We respond with an empty array to satisfy the handshake
+			return Encode("OK", true)
 		default:
 			return evalPING(cmd.Args)
 		}
@@ -382,8 +461,13 @@ func executeCommandToBuffer(cmd *RedisCmd,buf *bytes.Buffer,c *Client){
 	buf.Write(executeCommand(cmd,c))
 }
 
+// ExecuteCommandPublic is the exported version of executeCommand for use by the server package
+func ExecuteCommandPublic(cmd *RedisCmd, c *Client) []byte {
+	return executeCommand(cmd, c)
+}
+
 // func EvalAndRespond(cmd *Rediscmd,c net.Conn)error{
-func EvalAndRespond(cmds []*RedisCmd, c Client){
+func EvalAndRespond(cmds []*RedisCmd, c *Client){
 	//It's job is like depending on what job is sent to us
 	//we trigger the corresponding eval function
 
@@ -415,3 +499,4 @@ func EvalAndRespond(cmds []*RedisCmd, c Client){
 	// return err
 	c.Write(buf.Bytes())
 }
+
