@@ -76,6 +76,11 @@ func TestSetGetDel(t *testing.T) {
 		t.Fatalf("Failed to write GET: %v", err)
 	}
 	resp, _ = reader.ReadString('\n')
+	if strings.HasPrefix(resp, "$") {
+		// It's a bulk string, so read the next line too
+		resp2, _ := reader.ReadString('\n')
+		resp += resp2
+	}
 	if !strings.Contains(resp, "$3") && !strings.Contains(resp, "bar") {
 		t.Errorf("Expected $3...bar for GET, got: %q", resp)
 	}
