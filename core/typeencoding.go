@@ -30,9 +30,43 @@ func assertEncoding(te uint8,e uint8)error{
 	return nil
 }
 
+// TypeName returns the human-readable type name for the OBJECT TYPE command
+func TypeName(te uint8) string {
+	switch getType(te) {
+	case OBJ_TYPE_STRING:
+		return "string"
+	case OBJ_TYPE_HASH:
+		return "hash"
+	case OBJ_TYPE_LIST:
+		return "list"
+	case OBJ_TYPE_SET:
+		return "set"
+	default:
+		return "none"
+	}
+}
 
-
-
+// EncodingName returns the human-readable encoding name for the OBJECT ENCODING command
+func EncodingName(te uint8) string {
+	switch getEncoding(te) {
+	case OBJ_ENCODING_RAW:
+		return "raw"
+	case OBJ_ENCODING_INT:
+		return "int"
+	case OBJ_ENCODING_ZIPLIST:
+		return "ziplist"
+	case OBJ_ENCODING_HT:
+		return "hashtable"
+	case OBJ_ENCODING_QUICKLIST:
+		return "quicklist"
+	case OBJ_ENCODING_INTSET:
+		return "intset"
+	case OBJ_ENCODING_EMBSTR:
+		return "embstr"
+	default:
+		return "unknown"
+	}
+}
 
 
 
