@@ -2,7 +2,6 @@ package core
 
 import (
 	"sync"
-	"time"
 	
 	"github.com/sharpsalt/Velox-In-Memory-Database/config"
 )
@@ -26,7 +25,14 @@ func init(){
 
 func setExpiry(obj *Obj,expDurationMs int64){
 	// NOTE: caller must hold storeMu.Lock() before calling this
-	expires[obj]=uint64(time.Now().UnixMilli())+uint64(expDurationMs)
+	// PERF: using GlobalCachedTime instead of time.Now().UnixMilli() to avoid syscall
+	expires[obj]=uint64(GlobalCachedTime)+uint64(expDurationMs)
+}
+
+var objPool = sync.Pool{
+	New: func() interface{} {
+		return &Obj{}
+	},
 }
 
 //eralier we used to take (value interface{},DurationMs int64)
@@ -41,11 +47,10 @@ func NewObj(value interface{},expDurationMs int64,oType uint8,oEnc uint8) *Obj{
 
 		it means we have to create an enrty of particular object that is expired dictionary
 		*/
-	obj:=&Obj{
-       Value:value,
-       TypeEncoding:oType|oEnc,
-       LastAccessedAt:getCurrentClock(),
-    }
+	obj := objPool.Get().(*Obj)
+	obj.Value = value
+	obj.TypeEncoding = oType | oEnc
+	obj.LastAccessedAt = getCurrentClock()
     // NOTE: setExpiry is called inside Put which holds the lock,
     // or during NewObj before the object is visible to other goroutines.
     // For safety, we don't set expiry here — it's done in Put after acquiring the lock.
@@ -122,13 +127,18 @@ func Del(k string) bool{
 // delLocked performs deletion while the caller already holds storeMu.Lock()
 // This avoids double-locking when called from Get() or eviction functions
 func delLocked(k string) bool{
-	obj,ok:=store[k]
-    if ok {
-        delete(store, k)
-        delete(expires, obj)
-        KeyspaceStat[0]["keys"]--
-        return true
-    }
+	obj, ok := store[k]
+	if ok {
+		delete(store, k)
+		delete(expires, obj)
+		KeyspaceStat[0]["keys"]--
+		
+		// PERF: Clean up fields to avoid memory leaks before pooling
+		obj.Value = nil
+		objPool.Put(obj)
+		
+		return true
+	}
 	return false
 }
 
