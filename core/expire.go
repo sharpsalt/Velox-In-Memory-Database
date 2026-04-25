@@ -2,18 +2,17 @@ package core
 
 import (
 	"log"
-	"time"
 )
 
 // NOTE: hasExpired and getExpiry access the expires map
 // The caller is responsible for holding the appropriate lock (storeMu.RLock or storeMu.Lock)
 
-func hasExpired(obj *Obj) bool{
-	exp,ok:=expires[obj]
-	if !ok{
+func hasExpired(obj *Obj) bool {
+	exp, ok := expires[obj]
+	if !ok {
 		return false
 	}
-	return exp<=uint64(time.Now().UnixMilli())
+	return exp <= uint64(GlobalCachedTime)
 }
 
 func getExpiry(obj *Obj)(uint64,bool){
