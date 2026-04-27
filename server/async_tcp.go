@@ -115,7 +115,7 @@ func RunAsyncTCPServer(wg *sync.WaitGroup) error{
 	log.Println("Starting an asynchronous TCP Server on ",config.Host,config.Port)
 	/*
 	===========================================================================
-	🚀 SCALING TO MILLIONS OF CONCURRENT CLIENTS (The C10M Problem)
+	 SCALING TO MILLIONS OF CONCURRENT CLIENTS (The C10M Problem)
 	===========================================================================
 	Because we removed the pre-allocated buffers from the Client struct and moved
 	them to global sync.Pools, memory consumption per idle client is virtually ZERO.
