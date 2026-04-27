@@ -6,6 +6,7 @@ Velox is a Redis-compatible, in-memory key-value store built entirely from scrat
 
 
 <img width="923" height="119" alt="image" src="https://github.com/user-attachments/assets/41b479d0-7205-4d5f-b090-f23d3bcf3113" />
+<img width="941" height="327" alt="image" src="https://github.com/user-attachments/assets/253074ef-69a8-40fb-bada-89cc8d527014" />
 
 ---
 
