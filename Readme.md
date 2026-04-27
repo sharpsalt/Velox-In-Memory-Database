@@ -5,13 +5,8 @@
 Velox is a Redis-compatible, in-memory key-value store built entirely from scratch in Go. It speaks the Redis wire protocol (RESP), supports the same data types Redis does, and achieves multi-million requests-per-second throughput on a single thread by exploiting Linux's `epoll` event loop, `sync.Pool`-based zero-allocation buffers, and hand-written RESP encoding.
 
 ```
-====== Velox Benchmark ======
-Server: 127.0.0.1:7379
-Clients: 50 | Pipeline depth: 50 | Requests: 1,000,000 each
+<img width="923" height="119" alt="image" src="https://github.com/user-attachments/assets/41b479d0-7205-4d5f-b090-f23d3bcf3113" />
 
-PING  → 3,797,336 req/s  (0.26 s)
-SET   → 1,734,256 req/s  (0.58 s)
-GET   → 2,675,978 req/s  (0.37 s)
 ```
 
 ---
